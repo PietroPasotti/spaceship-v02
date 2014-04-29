@@ -10,7 +10,7 @@ import mapmethods
 
 sobject_tracker = []
 map_specials = None   # stores the map's height and width
-mapcode_tracker = {}
+mapcode_tracker = {}  # stores asteroids
 
 class Sobject(object):
 	
@@ -48,8 +48,15 @@ class Sobject(object):
 		return None
 	
 	def __str__(self):
-		return '{} {} {} ({}) '.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
-		
+		if self.objectclass == 'ship':
+			return '{} {} {} ({}) '.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
+			
+		if self.objectclass == 'building':
+			return '{} {} {} ({}) '.format(self.objectclass, self.states['buildingclass'], self.states['position'], self.states.get('code',''))
+			
+		if self.objectclass == 'fleet':
+			return '{} in mode {} {} ({}) '.format(self.objectclass,self.states.get('mode', "'normal'"), self.states.get('position',''), self.states.get('code',''))	
+			
 	def __repr__(self):
 		return str(self.states) + str(self.objectclass)
 			
@@ -126,8 +133,7 @@ class Sobject(object):
 		# now we make the object check its properties, so that it updates automatically all dependencies between states
 		self.checkStates()
 		return None
-		
-		
+			
 	def initFleet(self,specialattrs):
 		"""Initializes a fleet-subclass object."""
 		self.states['fleetmode'] = specialattrs.get('fleetmode', 'point') # the fleet can be a group of ships all in the same position, or a sparse one
@@ -164,7 +170,6 @@ class Sobject(object):
 		self.fleet_CheckStates()
 		print('{} initialized'.format(str(self)))
 
-
 	def initAsteroid(self, specialattrs):	
 		"""Initializes an asteroid object."""
 		
@@ -180,7 +185,70 @@ class Sobject(object):
 		
 		self.checkStates()
 		
+	def initBuilding(self,specialattrs):
+		"""Building Sobject initializer."""
+		buildingclass = specialattrs.get('buildingclass')
+		self.states['buildingclass'] = buildingclass
+		
+		if buildingclass == None:
+			raise Exception('Building constructor wants a buildingclass; no default building.')
+		else:
+			pass
+		
+		buildingdict = {'base' : 	{'max_attack':150,
+									'max_hull_integrity':500,
+									'max_range':4,
+									'max_shields': 20,
+									'max_spawn':1,
+									'code':'H'},
+									
+					'battery':		{'max_attack':100,
+									'max_hull_integrity':200,
+									'max_range':5,
+									'max_shields':15,
+									'code': 'B'},
+					
+					'buoy':			{'max_attack':0,
+									'max_hull_integrity':5,
+									'max_range':0,
+									'max_shields':0,
+									'code': 'b'}
+									
+									}
+		
+		possiblestates = ['max_attack', 'max_speed','max_range','max_warp','max_shields','max_spawn','cargo','code','max_hull_integrity','max_range']
+			
+		for a in possiblestates: # list of all possible states a freshly initialized building may have		
+			fetchedvalue = buildingdict[buildingclass].get(a,None) 
+			if fetchedvalue != None:
+				self.states[a] = fetchedvalue 
+			else:
+				pass
 
+		for key in specialattrs: # here we should retrieve the position!
+			self.states[key] = specialattrs[key]
+			
+		selfpos = self.states.get('position')
+		if selfpos == None:
+			raise Exception('Bad bad bad.')
+		else:
+			myasteroid = mapcode_tracker[selfpos]
+			self.states['asteroid'] = myasteroid # raises a keyerror if at selfpos there is no asteroid. There should be one!
+			
+			if myasteroid.states['building'] != None:
+				raise Exception('Trying to place a building on an already built asteroid.')
+			
+			myasteroid.states['building'] = self # tells the asteroid that now there is a building on it
+			
+			
+		
+		self.states['hull_integrity'] = self.states['max_hull_integrity'] # sets life to maximum
+		self.states['special_conditions'] = []                            # no special condition to begin with
+		self.states['action_points'] = 5								  # sets the action points to 10, which is half the maximum 	
+		
+		self.checkStates()
+		mapmethods.updatePoints(self.states['position'])
+	
 	def checkStates(self,params = None):
 		"""Updates automatically all dependencies between states, of any subclass of Sobject, by calling their specific subfunctions."""
 		
@@ -190,10 +258,11 @@ class Sobject(object):
 			return self.ship_CheckStates()
 		elif self.objectclass == 'fleet':
 			return self.fleet_CheckStates()
+		elif self.objectclass == 'building':
+			return self.building_CheckStates()
 		# all other classes
 		else:
 			return None
-
 
 	def fleet_CheckStates(self):
 		"""Updates all updateable states."""
@@ -243,58 +312,30 @@ class Sobject(object):
 				self.states['special_conditions'].remove(['hidden'])
 			else:
 				pass		
-					
-
+	
+	def building_CheckStates(self):
+		"""Subfunction for buildings' states."""
+		
+		life = self.states['hull_integrity']
+		maxlife = self.states['max_hull_integrity']
+		self.states['health'] = utilityfunctions.computelife(life,maxlife)
+		
+		self.states = utilityfunctions.determinemodifiedvalues(self.states)
+		
+		if self.states['health'] == 'destroyed':
+			self.states['can_be_attacked'] = False
+		else:
+			self.states['can_be_attacked'] = True
+		
 	def ship_CheckStates(self):
-		"""Subfunction for ship's states"""
+		"""Subfunction for ship's states."""
 		
 		life = self.states['hull_integrity']
 		maxlife = self.states['max_hull_integrity']
 		
-		if life<=-10:
-			healthState = 'destroyed'
-		elif -10<life<=0:
-			healthState = 'severely_damaged'
-		elif 0< life <= (maxlife / 3):
-			healthState = 'seriously_damaged'
-		elif (maxlife / 3) < life <= ((2 * maxlife) / 3):
-			healthState = 'damaged'
-		elif ((2 * maxlife) / 3) < life < maxlife:
-			healthState = 'lightly_damaged'
-		elif life == maxlife:
-			healthState = 'intact'
-		else:
-			raise sobjectmethodsError('Something wrong with health Sobject.ship_CheckStates routine.')
+		self.states['health'] = utilityfunctions.computelife(life,maxlife)
 		
-		self.states['health'] = healthState
-		
-		attackmodifiers = {	'intact':1,
-							'lightly_damaged':0.8,
-							'damaged':0.6,
-							'seriously_damaged':0.4,
-							'severely_damaged':0.2,
-							'destroyed':0}
-							
-		shieldsmodifiers = {'intact':0,
-							'lightly_damaged':-3,
-							'damaged':-7,
-							'seriously_damaged':-12,
-							'severely_damaged':-17,
-							'destroyed':-23}
-		
-		genericmodifier = attackmodifiers[healthState] # a positive float
-		
-		shieldmodifier = shieldsmodifiers[healthState] # will be a negative integer
-		
-		self.states['attack'] = int(self.states['max_attack'] * genericmodifier)
-		self.states['shields'] = max(int(self.states.get('max_shields',0) + shieldmodifier),0)
-		self.states['speed'] = int(self.states['max_speed'] * genericmodifier) # same as attack!
-		self.states['range'] = int(self.states['max_range'] * genericmodifier)
-		
-		if self.states['attack'] == 0:
-			self.states['can_attack'] = False
-		else:
-			self.states['can_attack'] = True
+		self.states = utilityfunctions.determinemodifiedvalues(self.states) # updates the states depending on life and modifiers
 			
 		# parses states[conditionsmodifiers], to override all other conditions
 		
@@ -330,6 +371,9 @@ class Sobject(object):
 
 
 # MOVEMENT FUNCTIONS
+	def pos(self):
+		return self.states['position']
+
 	def move(self,arg):
 		"""Takes as input a position tuple, a direction, a sobject or a list of instructions.
 		position tuple: goes there if it is not out of range, otherwise it moves as close as possible.
@@ -557,6 +601,90 @@ class Sobject(object):
 		enemyloss = inidefenders - len(other.states.get('shiplist',[1]))
 
 		print('Attacker has lost {} ships, enemy has lost {} ships.'.format(str(selfloss),str(enemyloss)))
+
+# SPAWN FUNCTIONS
+
+	def size(self):
+		"""Returns an integer, depending on the size of the vessel."""
+		if self.objectclass != 'ship':
+			raise Exception('Only ships have a size')
+		
+		smallships = "swarmer fighter bomber healer".split(' ')
+		
+		mediumships = "cruiser destroyer".split(' ')
+		
+		bigships = ["mothership"]
+		
+		valuesdict = {}
+		
+		for i in smallships:
+			valuesdict[i] = 1
+		for i in mediumships:
+			valuesdict[i] = 2
+		for i in bigships:
+			valuesdict[i] = 3
+			
+		return valuesdict[self.states['shipclass']]
+		
+	def spawn(self,sobject):
+		"""Makes self spawn one or more sobjects."""
+		
+		if isinstance(sobject,list):	
+			for elem in sobject:
+				if isinstance(elem,Sobject) == False or elem.objectclass != 'ship':
+					return 'Not a spawnable object: received a '+ str(elem)
+				else:
+					return self.spawn(elem)
+		elif isinstance(sobject,Sobject):
+			pass # passes only if the sobject is a Sobject object
+		else:
+			raise Exception('Bad input for spawn function; received a ' + str(sobject) + ' instead of a spawnable.')
+		
+		
+		
+		if self.states['spawn'] < sobject.size():
+			return 'Cannot spawn this ship from this object.'
+		else:
+			pass
+		
+		def dodge(tpl):
+			"""Returns all eight squares adjacent to a x,y position tuple."""
+			x,y = tpl # unpack
+			return random.choice([((x+1),(y+1)),((x-1),(y-1)),((x+1),(y-1)),((x-1),(y+1)), ((x-1),(y)), ((x+1),(y)), ((x-1),(y)),((x+1),(y))])
+		
+		selfpos = self.states['position']
+		
+		if len(selfpos) != 2:
+			raise Exception('Something wrong here, my position is ' + str(selfpos))
+		
+		pos = dodge(selfpos)		
+		
+		sobject.states['position'] = pos 
+		mapmethods.updatePoints(pos) # UPDATES the map!
+		
+		print(str(sobject) + ' spawned from ' +str(self) + ' at position '+ str(pos))
+		
+	def launch(self, shipclass, shipnumber, overrides):
+		"""Buys and spawns shipnumber ships of shipclass class."""
+		listofships = []
+		if 'override' in overrides:
+			pass
+		else:
+			# checks for ENERGY!
+			pass
+			
+		for i in range(shipnumber):
+			a = objectmethods.Sobject('ship',{'shipclass':shipclass})
+			listofships.extend([a])
+			
+			myfaction = self.states['faction']
+			
+			a.states['faction'] = myfaction
+			myfaction.states['ships'].extend([a])
+			self.spawn(a)
+		
+			
+
 
 
 

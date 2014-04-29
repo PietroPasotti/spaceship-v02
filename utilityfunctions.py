@@ -137,11 +137,91 @@ def findpath(obj,other):
 	
 	return tail
 		
+def computelife(currentvalue,maximum):
+	life = currentvalue
+	maxlife = maximum
+
+	if life<=-10:
+		healthState = 'destroyed'
+	elif -10<life<=0:
+		healthState = 'severely_damaged'
+	elif 0< life <= (maxlife / 3):
+		healthState = 'seriously_damaged'
+	elif (maxlife / 3) < life <= ((2 * maxlife) / 3):
+		healthState = 'damaged'
+	elif ((2 * maxlife) / 3) < life < maxlife:
+		healthState = 'lightly_damaged'
+	elif life == maxlife:
+		healthState = 'intact'
+	else:
+		raise Exception('Something wrong with computelife routine.')
+	
+	return healthState
+
+def determinemodifiedvalues(dictionary):
+	"""Modifies some values of the dictionary, and returns it."""
+	
+	attackmodifiers = {	'intact':1,
+						'lightly_damaged':0.8,
+						'damaged':0.6,
+						'seriously_damaged':0.4,
+						'severely_damaged':0.2,
+						'destroyed':0}
+						
+	shieldsmodifiers = {'intact':0,
+						'lightly_damaged':-3,
+						'damaged':-7,
+						'seriously_damaged':-12,
+						'severely_damaged':-17,
+						'destroyed':-23}
+	
+	healthState = dictionary['health']
+	
+	genericmodifier = attackmodifiers[healthState] # a positive float
+	shieldmodifier = shieldsmodifiers[healthState] # will be a negative integer
+	
+	if dictionary.get('max_shields') != None:
+		dictionary['shields'] = max(int(dictionary.get('max_shields',0) + shieldmodifier),0)	
+
+	if dictionary.get('max_attack') != None:
+		dictionary['attack'] = int(dictionary['max_attack'] * genericmodifier)
+	
+	if dictionary.get('max_range') != None:
+		dictionary['range'] = int(dictionary['max_range'] * genericmodifier)
 		
-		
+	if dictionary.get('max_speed') != None:
+		dictionary['speed'] = int(dictionary['max_speed'] * genericmodifier)	
+
+	if dictionary.get('max_spawn') != None:
+		dictionary['spawn'] = int(dictionary['max_spawn'] * genericmodifier)
+	
+	if dictionary['attack'] == 0:
+		dictionary['can_attack'] = False
+	else:
+		dictionary['can_attack'] = True	
+	
+	return dictionary
+
+def randomasteroid():
+	allplots = [ astr for astr in objectmethods.sobject_tracker if astr.objectclass == 'asteroid' and astr.states['building'] == None ]
+	return random.choice(allplots)
+
+def approx(point,threshold,oclass):
+	"""Returns as a list the sobjects of objectclass oclass which are within distance threshold from the give point."""
+	simobjects = [obj for obj in objectmethods.sobject_tracker if obj.objectclass == oclass] # e.g. all asteroids, all ships...
+	
+	posX = point[0]
+	posY = point[1]
+	
+	nearX = {obj for obj in simobjects if  posX - threshold < obj.states['position'][0] < posX +threshold}
+	nearY = {obj for obj in simobjects if  posY - threshold < obj.states['position'][1] < posY +threshold}
+	
+	neighbours = nearX.intersection(nearY)
+	
+	return list(neighbours)
 
 
 
 
 
-		
+

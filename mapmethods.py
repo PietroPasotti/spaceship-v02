@@ -28,10 +28,6 @@ def createMapCode(height = 40,width = 100,asteroidratio = 0.04):  # default valu
 				pass
 	
 	return (mapCode,height,width)  
-def LdistX(point,Map):
-	return {dot for dot in Map.body.keys() if dot[0] in [(point[0] + 1), (point[0] - 1), point[0]]}			
-def LdistY(point,Map):	
-	return {dot for dot in Map.body.keys() if dot[1] in [(point[1] + 1), (point[1] - 1), point[1]]}
 def	neighbourCount(point,dictionary):
 	count = 0
 	
@@ -241,9 +237,9 @@ def newMap(parameters = None):
 	
 	objectmethods.map_specials = propagatedmapcode.pop('specials')
 	
-	for entry in propagatedmapcode:
+	for entry in propagatedmapcode: # is a function: no duplicate entries
 		newAsteroid = objectmethods.Sobject('asteroid',{'position':entry}) # the position is entry.
-		objectmethods.sobject_tracker.extend([newAsteroid])
+		objectmethods.mapcode_tracker[entry] =  newAsteroid
 	
 	print('Newmap procedure completed. Welcome to sector '+str(objectmethods.map_specials[2]))	
 
@@ -251,6 +247,7 @@ def topObjectAt(coordinates):
 	"""Returns the object in the top layer for that position."""
 
 	objectsatpos = [sobj for sobj in objectmethods.sobject_tracker if sobj.states.get('position') == coordinates]
+	asteroid =  objectmethods.mapcode_tracker.get(coordinates) #can be none
 
 	fleetsat = [fleet for fleet in objectsatpos if fleet.objectclass == 'fleet']
 	if fleetsat == []: 																			# LAYER 3
@@ -264,18 +261,20 @@ def topObjectAt(coordinates):
 	else:
 		return utilityfunctions.mostPowerful(shipsat) # returns the most powerful
 
-	if [astr for astr in objectsatpos if astr.objectclass == 'asteroid'] == []: 				# LAYERs 1-0
-		return None # empty space there.
-	else:
-		asteroid = [astr for astr in objectsatpos if astr.objectclass == 'asteroid'][0]  # there can be only one asteroid per position.
+	if asteroid != None: 																		# LAYERs 1-0
 		if asteroid.states.get('building') == None:
 			return asteroid  # if it is not built, returns itself.
 		else:
 			return asteroid.states['building'] # returns the building which is on it!
-	
+	else:
+		return asteroid 																		# that is: None
+		
 def allObjectsAt(coordinates):
 	"""Returns all objects at the position."""
-	return [obj for obj in objectmethods.sobject_tracker if obj.states.get('position') == coordinates]
+	astr = objectmethods.mapcode_tracker.get(coordinates,[])
+	if astr != []:
+		astr = [astr]
+	return [obj for obj in objectmethods.sobject_tracker if obj.states.get('position') == coordinates] + astr
 		
 def map_brutal_dump(view = 'godview'):
 	"""Brutally dumps the codes of all Sobjects existing in the universe."""

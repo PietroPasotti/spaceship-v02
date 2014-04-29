@@ -12,7 +12,7 @@ common_nouns = """Bed Sword House Glass Word Sentence Poem Crop Field Plant Gras
 
 philosophical_nouns = """Ludwig Karl Friedrich Gustav August Austin Schiller John-Stuart Abelard JohnBuridan SaintThomas Plato Socrates Aristoteles""".split(' ')
 
-animal_nouns = """Gorilla Lion Zebra Tiger Cat Dog Cheetah Eagle Sparrow Whale Dolphin Human Alien SeaLion Seal Fish Horse Donkey Mule Camel""".split(' ')
+animal_nouns = """Gorilla Lion Zebra Tiger Cat Dog Cheetah Eagle Sparrow Whale Dolphin Human Alien SeaLion Seal Gundam Horse Donkey Mule Camel""".split(' ')
 
 def namegen(kwarg=None):
 	
@@ -23,6 +23,9 @@ def namegen(kwarg=None):
 	elif kwarg == 'a': # an asteroid
 		for i in range(8):
 			name = name + random.choice(list('0123456789'))
+		return name
+	elif kwarg == 'F': # a faction
+		name = 'The'+random.choice(animal_nouns)+'s'
 		return name
 	elif kwarg == 'f': # a fleet
 		num = random.random() 
@@ -37,6 +40,8 @@ def namegen(kwarg=None):
 			name = 'A'+random.choice(tamarr_adjectives)+random.choice(animal_nouns)
 		else:
 			name = random.choice(common_nouns)+'s' + 'Of' + random.choice(philosophical_nouns)
+		return name
+	
 	elif kwarg == 'b': # a building
 		return 'Building_name' # the building's name will be the building buildingclass, plus maybe a code derived from the asteroid?
 	else:
