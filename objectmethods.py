@@ -3,41 +3,21 @@
 # will contain a single class for any object which may ever appear on a map
 import random,math
 import namegenmethods
+from utilityfunctions import *
+import utilityfunctions
 from copy import deepcopy
-
+import mapmethods
 
 sobject_tracker = []
-
-class sobjectmethodsError(Exception):
-	def __init__(self,parent):
-		super().__init__(parent)
-		
-def roll(x):
-	if x == 0:
-		return 0
-	else:
-		x = int(math.sqrt(int(x) ** 2))
-		try:
-			num = random.randrange(1,int(x)+1,1)
-		
-		except ValueError:
-			
-			return 0
-		
-		return num
-
-def canAttackers(listofships):
-	return [ship for ship in listofships if ship.states['can_attack'] == True]
-	
-def canDefenders(listofships):
-	return [ship for ship in listofships if ship.states['can_be_attacked'] == True]
+map_specials = None   # stores the map's height and width
+mapcode_tracker = {}
 
 class Sobject(object):
 	
 	def __init__(self,objectclass_str,specialattrs_dict = {}):
 		"""Takes as input an objectclass, and optional specialattrs"""
 		
-		self.states = {}
+		self.states = {'position':None}  # initial position is none by default
 		self.objectclass = objectclass_str
 		
 		if self.objectclass == 'ship':
@@ -68,7 +48,7 @@ class Sobject(object):
 		return None
 	
 	def __str__(self):
-		return '{} {} ({}) '.format(self.objectclass, self.states.get('name', ''), self.states.get('code',''))
+		return '{} {} {} ({}) '.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
 		
 	def __repr__(self):
 		return str(self.states) + str(self.objectclass)
@@ -91,6 +71,7 @@ class Sobject(object):
 									'max_speed':5,
 									'max_hull_integrity':500,
 									'max_range':3,
+									'warp':(True,10), # warp! (ability_to_warp, cooldown) 
 									'max_spawn':1,
 									'max_shields':20,
 									'code': 'M'},
@@ -140,7 +121,7 @@ class Sobject(object):
 		# now we define all the states which a ship must have no-matter-what, and that do not depend on shipclass
 		self.states['hull_integrity'] = self.states['max_hull_integrity'] # sets life to maximum
 		self.states['special_conditions'] = []                            # no special condition to begin with
-		
+		self.states['action_points'] = 5								  # sets the action points to 10, which is half the maximum 	
 		
 		# now we make the object check its properties, so that it updates automatically all dependencies between states
 		self.checkStates()
@@ -174,6 +155,7 @@ class Sobject(object):
 		# attributes any fleet must have
 		
 		self.states['special_conditions'] = []
+		self.states['action_points'] = 5	
 		
 		# overrides anything previously upped, if special params were passed
 		for key in specialattrs:
@@ -181,6 +163,37 @@ class Sobject(object):
 			
 		self.fleet_CheckStates()
 		print('{} initialized'.format(str(self)))
+
+
+	def initAsteroid(self, specialattrs):	
+		"""Initializes an asteroid object."""
+		
+		self.states['building'] = None
+		self.states['code'] = '1'
+		self.states['name'] = namegenmethods.namegen('a')
+		self.states['can_be_attacked'] = False
+		self.states['inhert'] = True # can not be interacted with, and should not appear in menu voices
+		self.states['hostile'] = False # not tracked as enemy by AI and sensors
+		
+		for entry in specialattrs: # we override the default with the optional parameters
+			self.states[entry] = specialattrs[entry]
+		
+		self.checkStates()
+		
+
+	def checkStates(self,params = None):
+		"""Updates automatically all dependencies between states, of any subclass of Sobject, by calling their specific subfunctions."""
+		
+		if self.objectclass == 'asteroid': # DOES NOTHING; they are so small and simple that other methods can take care of that.
+			pass 
+		elif self.objectclass == 'ship':
+			return self.ship_CheckStates()
+		elif self.objectclass == 'fleet':
+			return self.fleet_CheckStates()
+		# all other classes
+		else:
+			return None
+
 
 	def fleet_CheckStates(self):
 		"""Updates all updateable states."""
@@ -192,7 +205,12 @@ class Sobject(object):
 		self.states['shiplist'] = [ship for ship in self.states['shiplist'] if ship.states['health'] != 'destroyed']
 
 		for ship in self.states['shiplist']:
-			ship.ship_CheckStates()	
+			ship.ship_CheckStates()
+			
+		# ACTIONPOINTS:
+		if sum([ship.states['action_points'] for ship in self.states['shiplist']]) == 0:
+			self.states['action_points'] = 0 # there must be at least one ship able to act there in order for the fleet to do the same.	
+			
 		
 		if self.states['shiplist'] == []:
 			# then it dies.
@@ -226,29 +244,6 @@ class Sobject(object):
 			else:
 				pass		
 					
-	def initAsteroid(self, specialattrs):	
-		
-		self.built = False
-		self.states['code'] = '1'
-		self.states['attackable'] = False
-		self.states['hostile'] = False
-		self.checkStates()	
-		
-	def checkStates(self,params = None):
-		"""Updates automatically all dependencies between states."""
-		
-		if self.objectclass == 'asteroid':
-			if self.building.states['health'] == 'destroyed':
-				self.built = False
-			else:
-				self.built = True
-		elif self.objectclass == 'ship':
-			return self.ship_CheckStates()
-		elif self.objectclass == 'fleet':
-			return self.fleet_CheckStates()
-		# all other classes
-		else:
-			return None
 
 	def ship_CheckStates(self):
 		"""Subfunction for ship's states"""
@@ -334,8 +329,144 @@ class Sobject(object):
 			self.states['can_be_attacked'] = True
 
 
-
-
+# MOVEMENT FUNCTIONS
+	def move(self,arg):
+		"""Takes as input a position tuple, a direction, a sobject or a list of instructions.
+		position tuple: goes there if it is not out of range, otherwise it moves as close as possible.
+		direction: goes in that direction as far as it can
+		list of instructions: it follows it as far as it can
+		sobject: transforms it into a tuple (its position)."""
+		
+		if self.states.get('speed',0) == 0:
+			return str(self) + ' cannot move as its speed is zero.'
+		
+		if isinstance(arg,Sobject):
+			arg = arg.states['position']
+			if arg == None:
+				raise Exception('No direction to move to.')
+		
+		if self.states.get('position') == None:
+			self.warp(arg,['silent','override'])
+		
+		if self.states['position'] == arg:
+			return None
+		
+		oripos = deepcopy(self.states['position'])
+		
+		instructionsDict = {'u':(0,-1),'d':(0,1),'l':(-1,0),'r':(1,0),'ul':(-1,-1),'ur':(1,-1),'dl' : (-1,1), 'dr':(1,1)}
+		
+		if isinstance(arg,str):
+			if not [ letter in 'udlr' for letter in arg ] == [True for i in range(len(arg))]: # checks the syntax
+				raise Exception('Input error for move function: received' + arg)
+			else:
+				counter = 0
+				while counter < len(arg): # until the end of the string or the end of its speed; the shortest
+					if counter >= self.states['speed']:
+						print('The object cannot move that much: breaking...')
+						break
+					
+					syllable = 'guruguru'
+					
+					if len(arg) >= counter + 1:
+						syllable = arg[counter] + arg[counter + 1] # picks the next two letters.
+						
+					if syllable in ['ul','ur','dl','dr']:	# if it recognizes a syllable		
+						X,Y = self.states['position']
+						X = X + instructionsDict[letter][0]
+						Y = Y + instructionsDict[letter][1]
+						self.states['position'] = mapmethods.torusize((X,Y))
+						counter +2						
+					else:							
+						letter = arg[counter] # parses the string from 0 to end
+						X,Y = self.states['position']
+						X = X + instructionsDict[letter][0]
+						Y = Y + instructionsDict[letter][1]
+						self.states['position'] = mapmethods.torusize((X,Y))
+						counter +=1
+		
+		elif isinstance(arg,tuple):
+			
+			if mapmethods.distance(self.states['position'],arg) <= self.states['speed']:
+				self.warp(arg,['override','silent'])
+				
+			else:
+				# finds the closest point to the destination and goes there
+				arg = self.closestTowards(arg)
+				self.warp(arg,['override','silent'])
+			pass
+		
+		else:
+			raise Exception('Unrecognized argument for move routine: ' +str(arg))	
+			
+		if self.objectclass != 'fleet':
+			pass
+		else:
+			for ship in self.states['shiplist']:
+				ship.states['position'] = self.states['position'] # moves all ships in the shiplist at its new position
+		
+		newpos = deepcopy(self.states['position'])
+		mapmethods.updatePoints(oripos,newpos) # important! updates the mapcode_tracker
+	
+	def actionpoints(self):
+		return self.states.get('action_points',None)
+	
+	def closestTowards(self,arg):
+		"""Finds and returns the closest point to the destination it can reach in a single move."""
+		
+		path = utilityfunctions.findpath(self,arg)
+		
+		if len(path) == 1:
+			return path[0]
+		elif len(path) <= self.states['speed']:
+			return path[len(path)-1] # the last position in the path
+		else:
+			return path[self.states['speed']] # the last reachable position
+		
+	def warp(self,newpos,specialargslist = []):
+		"""Warp!"""
+		if 'override' in specialargslist:
+			pass
+		elif self.states.get('warp') != None and self.states['warp'][1] >= 10:
+			pass
+		elif len(newpos) != 2:
+			raise Exception('Bad input: received newpos = ',str(newpos))
+		else:
+			return None # this ship cannot warp
+		
+		if self.states['position']!= None:  # if for some reason this was the first warp...
+			oripos = self.states['position'] 
+			mapmethods.updatePoints(oripos)
+		else:
+			pass
+		
+		self.states['position'] = newpos # sets the position to the new position	
+		mapmethods.updatePoints(newpos)
+		
+		if 'silent' in specialargslist:
+			return None
+		else:
+			print(self.states['name'] + ' warped to ' + str(newpos))
+				
+	def land(self,pos):
+		"""The fleet or vessel goes to land to a position."""
+		self.move(pos)
+		
+		asteroidshere = [ astr for astr in mapmethods.allObjectsAt(self.states['position']) if astr.objectclass == 'asteroid' ]
+		
+		if asteroidshere == []:
+			return 'Nowhere to land there.'
+		else:
+			asteroid = asteroidshere[0] # there should be only one... however...
+			self.states['special_conditions'].extend(['landed'])
+	
+	def leave(self):
+		"""Takes off, if it was landed."""
+		if 'landed' in self.states['special_conditions']:
+			self.states['special_conditions'].remove('landed')
+		else:
+			return None
+				
+# FIGHT FUNCTIONS
 	def attack(self,other):
 		"""Any combination of ship vs fleet vs building."""
 		if isinstance(other,Sobject) == False:
@@ -428,18 +559,4 @@ class Sobject(object):
 		print('Attacker has lost {} ships, enemy has lost {} ships.'.format(str(selfloss),str(enemyloss)))
 
 
-a = Sobject('ship')
 
-b = Sobject('ship',{'shipclass':'mothership'})
-
-c = Sobject('ship',{'shipclass':'fighter'})
-
-d = Sobject('fleet',{'shiplist':['fighter','destroyer','cruiser','swarmer',b]})
-
-e = Sobject('fleet',{'shiplist':['fighter','fighter','destroyer','cruiser','mothership']})
-
-a.attack(b)
-
-b.attack(c)
-c.attack(a)
-a.attack(c)

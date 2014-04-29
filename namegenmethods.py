@@ -2,16 +2,13 @@
 
 import random
 
-normal_adjectives = """Cold Hot Grievous Grand Big Shiny Silent Noisy Sparkling Little Tiny Shady Mysterious Feminine Masculine Childish Poor 
-Red Black White Yellow Blue Azure Emerald Coral Green Orange Purple Cyan Magenta""".split(' ')
+normal_adjectives = """Cold Hot Grievous Grand Big Shiny Silent Noisy Sparkling Little Tiny Shady Mysterious Feminine Masculine Childish Poor Red Black White Yellow Blue Azure Emerald Coral Green Orange Purple Cyan Magenta""".split(' ')
 
 tamarr_adjectives = """Brutalized Inspired Gorgeous Superb Zenital Mindblowing Mindfucking""".split(' ')
 
 philosophical_adjectives = """Wittgensteinian Nietzschean Hegelian Marxian Leninian Communist Atheistic Religious""".split(' ')
 
-common_nouns = """Bed Sword House Glass Word Sentence Poem Crop Field Plant Grass Leaf Tree Vase Cushion Pillow Napkin Newspaper Tabloid Character 
-Duvet Sun Moon Star Ceiling Floor Constellation Letter Postcard Blossom Sky Ocean Land Earth Ground Hill Heart Pancreas Colon Brain Skull Wallpaper 
-Plane Wing Gull Feather Father Mother Sister Daughter Son Uncle Nephew Niece Barbarian Warrior Druid""".split(' ')
+common_nouns = """Bed Sword House Glass Word Sentence Poem Crop Field Plant Grass Leaf Tree Vase Cushion Pillow Napkin Newspaper Tabloid Character Duvet Sun Moon Star Ceiling Floor Constellation Letter Postcard Blossom Sky Ocean Land Earth Ground Hill Heart Pancreas Colon Brain Skull Wallpaper Plane Wing Gull Feather Father Mother Sister Daughter Son Uncle Nephew Niece Barbarian Warrior Druid""".split(' ')
 
 philosophical_nouns = """Ludwig Karl Friedrich Gustav August Austin Schiller John-Stuart Abelard JohnBuridan SaintThomas Plato Socrates Aristoteles""".split(' ')
 
