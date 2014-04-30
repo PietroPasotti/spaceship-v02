@@ -3,6 +3,7 @@
 # will contain a single class for any object which may ever appear on a map
 import random,math
 import namegenmethods
+import dialogmethods
 from utilityfunctions import *
 import utilityfunctions
 from copy import deepcopy
@@ -42,8 +43,11 @@ class Sobject(object):
 			
 		else:
 			return 'Unsupported objectclass input for Sobject constructor'
+		if self.objectclass != 'asteroid':
+			sobject_tracker.extend([self])
 		
-		sobject_tracker.extend([self])
+		
+		self.circle = None
 		
 		return None
 	
@@ -51,12 +55,18 @@ class Sobject(object):
 		if self.objectclass == 'ship':
 			return '{} {} {} ({}) '.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
 			
-		if self.objectclass == 'building':
+		elif self.objectclass == 'building':
 			return '{} {} {} ({}) '.format(self.objectclass, self.states['buildingclass'], self.states['position'], self.states.get('code',''))
 			
-		if self.objectclass == 'fleet':
+		elif self.objectclass == 'fleet':
 			return '{} in mode {} {} ({}) '.format(self.objectclass,self.states.get('mode', "'normal'"), self.states.get('position',''), self.states.get('code',''))	
-			
+		
+		elif self.objectclass == 'asteroid':
+			return 'asteroid {}, floating at {}'.format(self.states['name'],self.pos())
+		
+		else:
+			return str(self.states)
+		
 	def __repr__(self):
 		return str(self.states) + str(self.objectclass)
 			
@@ -128,7 +138,11 @@ class Sobject(object):
 		# now we define all the states which a ship must have no-matter-what, and that do not depend on shipclass
 		self.states['hull_integrity'] = self.states['max_hull_integrity'] # sets life to maximum
 		self.states['special_conditions'] = []                            # no special condition to begin with
-		self.states['action_points'] = 5								  # sets the action points to 10, which is half the maximum 	
+		self.states['action_points'] = 5.0								  # sets the action points to 10, which is half the maximum
+		
+		
+		self.setupSensorArrays() # Sets up default sensor arrays
+		
 		
 		# now we make the object check its properties, so that it updates automatically all dependencies between states
 		self.checkStates()
@@ -161,7 +175,7 @@ class Sobject(object):
 		# attributes any fleet must have
 		
 		self.states['special_conditions'] = []
-		self.states['action_points'] = 5	
+		self.states['action_points'] = 5.0
 		
 		# overrides anything previously upped, if special params were passed
 		for key in specialattrs:
@@ -231,20 +245,25 @@ class Sobject(object):
 		selfpos = self.states.get('position')
 		if selfpos == None:
 			raise Exception('Bad bad bad.')
-		else:
-			myasteroid = mapcode_tracker[selfpos]
-			self.states['asteroid'] = myasteroid # raises a keyerror if at selfpos there is no asteroid. There should be one!
-			
-			if myasteroid.states['building'] != None:
-				raise Exception('Trying to place a building on an already built asteroid.')
-			
-			myasteroid.states['building'] = self # tells the asteroid that now there is a building on it
+		
+		myasteroid = mapcode_tracker[selfpos]			# finds his asteroid
+		self.states['asteroid'] = myasteroid			
+		sobject_tracker.append(self)					#### updates sobject_tracker
+		
+		if myasteroid.states['building'] != None:
+			raise Exception('Trying to place a building on an already built asteroid.')
+		
+		myasteroid.states['building'] = self # tells the asteroid that now there is a building on it
 			
 			
 		
 		self.states['hull_integrity'] = self.states['max_hull_integrity'] # sets life to maximum
 		self.states['special_conditions'] = []                            # no special condition to begin with
-		self.states['action_points'] = 5								  # sets the action points to 10, which is half the maximum 	
+		self.states['action_points'] = 5.0								  # sets the action points to 10, which is half the maximum 	
+		
+		
+		self.setupSensorArrays() # Sets up default sensor arrays
+		
 		
 		self.checkStates()
 		mapmethods.updatePoints(self.states['position'])
@@ -374,6 +393,18 @@ class Sobject(object):
 	def pos(self):
 		return self.states['position']
 
+	def canMove(self,arg=None):
+		"""Checks whether the object can move (to somewhere, if give in params)"""
+		switch = True
+
+		if self.states.get('speed',0) == 0: 							# disabler 1 : speed
+			switch = False
+			
+		if self.states['action_points'] == 0:							# disabler 2 : ap
+			switch = False
+
+		return switch
+
 	def move(self,arg):
 		"""Takes as input a position tuple, a direction, a sobject or a list of instructions.
 		position tuple: goes there if it is not out of range, otherwise it moves as close as possible.
@@ -381,15 +412,18 @@ class Sobject(object):
 		list of instructions: it follows it as far as it can
 		sobject: transforms it into a tuple (its position)."""
 		
-		if self.states.get('speed',0) == 0:
-			return str(self) + ' cannot move as its speed is zero.'
+		if self.canMove(arg) == True:
+			pass
+		else:
+			return None
 		
-		if isinstance(arg,Sobject):
-			arg = arg.states['position']
-			if arg == None:
-				raise Exception('No direction to move to.')
+		if arg != None:
+			if isinstance(arg,Sobject):
+				arg = arg.states['position']	
+		else:
+			raise Exception('No direction to move to. Arg is None.')
 		
-		if self.states.get('position') == None:
+		if self.states.get('position') == None:						# only for utility
 			self.warp(arg,['silent','override'])
 		
 		if self.states['position'] == arg:
@@ -418,6 +452,13 @@ class Sobject(object):
 						X,Y = self.states['position']
 						X = X + instructionsDict[letter][0]
 						Y = Y + instructionsDict[letter][1]
+						
+						if self.ap_pay('move2') == True: 						# AP checkpoint
+							pass
+						else:
+							return 'The ship has no more action_points'
+						
+							
 						self.states['position'] = mapmethods.torusize((X,Y))
 						counter +2						
 					else:							
@@ -425,18 +466,25 @@ class Sobject(object):
 						X,Y = self.states['position']
 						X = X + instructionsDict[letter][0]
 						Y = Y + instructionsDict[letter][1]
+						
+						if self.ap_pay('move1') == True:						 # AP checkpoint
+							pass
+						else:
+							return 'The ship has no more action_points'						
+						
 						self.states['position'] = mapmethods.torusize((X,Y))
 						counter +=1
 		
 		elif isinstance(arg,tuple):
+	
+			arg = self.closestTowards(arg)
 			
-			if mapmethods.distance(self.states['position'],arg) <= self.states['speed']:
-				self.warp(arg,['override','silent'])
-				
+			if self.ap_pay(mapmethods.distance(oripos,arg))	 == True:				# AP checkpoint
+				pass
 			else:
-				# finds the closest point to the destination and goes there
-				arg = self.closestTowards(arg)
-				self.warp(arg,['override','silent'])
+				raise Exception('Something wrong here. My APs are {}; oripos = {}, arg = {}'.format(self.actionpoints(), oripos, arg))
+			self.states['position'] = arg
+			
 			pass
 		
 		else:
@@ -454,18 +502,42 @@ class Sobject(object):
 	def actionpoints(self):
 		return self.states.get('action_points',None)
 	
-	def closestTowards(self,arg):
+	def closestTowards(self,arg,overrides = []):
 		"""Finds and returns the closest point to the destination it can reach in a single move."""
 		
 		path = utilityfunctions.findpath(self,arg)
 		
+		if 'override' in overrides:
+			maxbearablecost = 1000000.0
+		else:	
+			maxbearablecost = self.actionpoints()
+
+		dist = mapmethods.distance
+		pos = self.pos()
+		
+		costForPoint = { point : dist(pos,point) for point in path} # now we have a dictionary of point : cost for all points in path
+		
 		if len(path) == 1:
 			return path[0]
-		elif len(path) <= self.states['speed']:
-			return path[len(path)-1] # the last position in the path
+		elif len(path) <= self.states['speed']: 	# if speed is shorter than path
+			pass
+
 		else:
-			return path[self.states['speed']] # the last reachable position
+			path = path[:self.states['speed']] 		# crops the list at the last reachable position
 		
+		counter = len(path) - 1
+		while counter >= 0:
+			
+			tryPoint = path[counter]
+			counter -= 1 # the counter goes one position backwards
+			
+			if maxbearablecost >= tryPoint:
+				return tryPoint
+			else:
+				pass
+		
+		raise Exception('Error: something went wrong. Counter stopped at ' + str(counter) + ' and path was ' + str(path))
+			
 	def warp(self,newpos,specialargslist = []):
 		"""Warp!"""
 		if 'override' in specialargslist:
@@ -603,7 +675,6 @@ class Sobject(object):
 		print('Attacker has lost {} ships, enemy has lost {} ships.'.format(str(selfloss),str(enemyloss)))
 
 # SPAWN FUNCTIONS
-
 	def size(self):
 		"""Returns an integer, depending on the size of the vessel."""
 		if self.objectclass != 'ship':
@@ -640,13 +711,11 @@ class Sobject(object):
 		else:
 			raise Exception('Bad input for spawn function; received a ' + str(sobject) + ' instead of a spawnable.')
 		
-		
-		
 		if self.states['spawn'] < sobject.size():
 			return 'Cannot spawn this ship from this object.'
 		else:
 			pass
-		
+		 
 		def dodge(tpl):
 			"""Returns all eight squares adjacent to a x,y position tuple."""
 			x,y = tpl # unpack
@@ -670,7 +739,7 @@ class Sobject(object):
 		if 'override' in overrides:
 			pass
 		else:
-			# checks for ENERGY!
+			# checks for ENERGY! 
 			pass
 			
 		for i in range(shipnumber):
@@ -683,8 +752,312 @@ class Sobject(object):
 			myfaction.states['ships'].extend([a])
 			self.spawn(a)
 		
+# SCAN FUNCTIONS
+	def maxsensorsrange(self):
+		"""Name says it all."""
+		
+		choicelist = []
+		
+		for i in self.states['sensors']:
+			maxdist = i[3]
+			choicelist.append(maxdist)
+		
+		maxrange = max(choicelist)
+		return maxrange
+		
+	def updatecircle(self,ray = None):
+		"""Returns the list of absolute positions in which we can safely assume the ship's viewrange is contained."""
+		
+		if ray == None:	
+			ray = self.maxsensorsrange()
+
+		dodgex = range(-ray, ray+1)
+		dodgey = range(-ray, ray+1)
+		centerx,centery = self.pos()
+		
+		poslist = []
+		
+		for x in dodgex:
+			for y in dodgey:
+				poslist.append((centerx+x,centery+y))
+		
+		self.circle = poslist
+
+	def visibility(self):
+		"""Determines its visibility based on its special_conditions and other factors. The lower, the more the object is hidden."""
+		
+		if self.objectclass == 'asteroid':
+			return 1 # asteroids are always visible at max (and once discovered should stay visible)
+		
+		if 'hidden' in self.states['special_conditions']:
+			return 8.0 # this means that it is barely visible! 20% chances only if distance <= 1. Very low!
 			
+		return 0.0
 
+	def setupSensorArrays(self,standardgroup_or_models=[],overrides=[]):
+		"""Accepted inputs: 'dummy', 'basic_arrays', 'average_arrays', 'advanced_arrays', '*some-model*'; equips the object with such sensors."""
+		#model, number, quality, maxdist, chanceatmax, specialattrs = ship.states['sensors'][i]
+		
+		
+		sensorArrays = { 	'zero_sensor_mono': 		('zero_sensor',1,1,4,2,[]),
+							'basic_sensor_mono':   		('basic_sensor',1,1,6,2,[]),
+							'basic_sensor_double': 		('basic_sensor',2,1,6,2,[]),
+							'basic_sensor_triple': 		('basic_sensor',3,1,6,2,[]),
+							'medium_sensor_mono' : 		('medium_sensor',1,2,7,3,[]),	
+							'medium_sensor_double' : 	('medium_sensor',2,2,7,3,[]),	
+							'medium_sensor_triple' : 	('medium_sensor',3,2,7,3,[]),
+							'advanced_sensor_mono' : 	('advanced_sensor',1,3,10,5,[]),
+							'advanced_sensor_double' : 	('advanced_sensor',2,2,10,5,[]),
+							'advanced_sensor_triple' : 	('advanced_sensor',3,2,10,5,[]),
+							'gundam_array_double' : 	('gundam_sensor',2,4,15,6,[])		
+									}
+		
+		# we assume we only have to give to a ship a sensor array
+		
+		if standardgroup_or_models == [] or 'newship' in overrides:
+			if self.objectclass in ['ship', 'building']:
+				defaultArrays = {'ship' : { 'destroyer': 	'basic_sensor_double',
+											'cruiser' : 	'basic_sensor_double',
+											'mothership': 	'medium_sensor_double',
+											'generic' :		'basic_sensor_mono'	},
+												
+												
+								'building' : { 'base': 		'medium_sensor_mono',
+												'battery': 	'medium_sensor_mono',
+												'buoy': 	'zero_sensor_mono',
+												'generic' :		'basic_sensor_mono' }					
+										}
+				
+				recognizedClasses = list(defaultArrays['ship'].keys()) + list(defaultArrays['building'].keys()) 
+				
+				if self.objectclass not in ['ship','building']:
+					raise Exception('Unrecognised object class for sensors to set up: ' + str(self) + self.objectclass)
+					
+				if self.states.get('shipclass',self.states.get('buildingclass')) not in recognizedClasses:
+					pass # will give the GENERIC sensor
+				
+				objectclassSensors = defaultArrays[self.objectclass]
+				
+				mybuildingclass = self.states.get('buildingclass')
+				myshipclass = self.states.get('shipclass')
+				
+				if mybuildingclass != None:
+					mysensors = objectclassSensors.get(mybuildingclass, objectclassSensors['generic']) # if mybuildingclass is not recognized...
+				elif myshipclass != None:
+					mysensors = objectclassSensors.get(myshipclass, objectclassSensors['generic']) # ... gives the generic sensor arrays.
+				else: 	
+					raise Exception('Unrecognised object class for sensors to set up: ' + str(self) + self.objectclass)
+					
+				self.states['sensors'] = [sensorArrays[mysensors]]  # if this is the first time... creates a new list
+				
+				
+				# sensor is now set up
+				return None
+			
+			else:
+				raise Exception('Bad sobject input for setupSensorArrays: received a ' + str(self))
+			
+		elif standardgroup_or_models != []:
+			
+			for keyword in standardgroup_or_models:
+				if sensorArrays.get(keyword) != None:
+					self.states['sensors'].append(sensorArrays[keyword])
+				else:
+					raise Exception('Unrecognised input for setupSensorArrays: {} {}'.format(standardgroup_or_models,overrides))
+		
+				return None
+		
+	
+		else:
+			raise Exception('Bad input for setupSensorArrays: {} {}'.format(standardgroup_or_models,overrides))
+		
+		
+		return None
 
+	def perceivables(self,ray = None):
+		"""Returns a smartly generated list of objects on which the ship can scan."""
+		
+		if self.circle == None: # redundant
+			self.updatecircle()
+		if ray != None and isinstance(ray,int):
+			self.updatecircle(ray)
+			
+		
+		mycircle = self.circle
+		
+		objlist = []
+		
+		for pos in mycircle:
+			sobjects = [ obj for obj in sobject_tracker if obj.pos() == pos ]
+			asteroid = mapcode_tracker.get(pos)
+			objlist.extend(sobjects)
+			if asteroid == None:
+				pass
+			else:
+				objlist.append(asteroid)
+			
+		objlist.remove(self)
+		
+		return objlist
+		
+	def scan(self, params = None ,  overrides = []):
+		"""Accepted params are 'long', 'best', 'returnSensorsDict','lazy'."""
+		
+		if params == 'lazy': # performs a quick passive scan, very weak
+			if self.objectclass in ['ship','building']:
+				overrides.append('lazy')
+				self.runScan(overrides) # calls a scan bypassing the pay-APs step
+			elif self.objectclass == 'fleet':	
+				scanning = random.choice(self.states['shiplist'])
+				return scanning.scan('lazy') # recurse
+			
+			else:
+				raise Exception('This object cannot scan: ' + str(self))
+		
+		elif params == 'returnSensorsDict': # returns a dictionary of all sensors for self's shiplist or self
+			sensorsdict = {}
+			
+			if self.objectclass in ['ship','building']:
+				for i in self.states['sensors']:
+					model, number, quality, maxdist, chanceat1, specialattrs = self.states['sensors'][i]
+					sensorsdict['{} {} sensors'.format(number,model)] = "quality: {}, maxdist: {}, chance at 1: {}; specialattrs = {}".format( quality, maxdist, chanceat1, specialattrs)
+				return sensorsdict
+				
+			elif self.objectclass == 'fleet':
+				for ship in self.states['shiplist']:
+					for i in ship.states['sensors']:
+						model, number, quality, maxdist, chanceat1, specialattrs = ship.states['sensors'][i]
+						sensorsdict['{} {} sensors'.format(number,model)] = "quality: {}, maxdist: {}, chance at 1: {}; specialattrs = {}".format( quality, maxdist, chanceat1, specialattrs)
+				
+				return sensorsdict
+		
+			else:
+				raise Exception('Unsupported objectclass for scan function: received a ' + str(self)+ str(params) + str(overrides))
+		
+		elif params == 'long': # makes a long scan; if called on a fleet, each of its ships do a long scan
+			if self.objectclass in ['ship','building']:
+				pass
+			elif self.objectclass == 'fleet':
+				for i in self.states['shiplist']:
+					return i.scan('long',overrides)
+			else:
+				raise Exception('Unsupported objectclass for scan function: received a ' + str(self)+ str(params) + str(overrides))
+		
+		elif params == 'best': # makes the best of your ships do a long scan
+			if self.objectclass in ['ship','building']:
+				return self.scan('long', overrides)
+			elif self.objectclass == 'fleet':
+				sensorsdict = {}
+				for ship in self.states['shiplist']:
+					for i in ship.states['sensors']:
+						model, number, quality, maxdist, chanceat1, specialattrs = ship.states['sensors'][i]
+						sensorsdict[quality] = ship
+						
+				best_sensor_ship = sensorsdict[max(sensorsdict.keys())]
+				return best_sensor_ship.scan('long', overrides)
 
+			else:
+				raise Exception('Unsupported objectclass for scan function: received a ' + str(self)+ str(params) + str(overrides))
+		
+		else:
+			raise Exception('Unrecognized parameters for scan function: received a '+  str(params))
+		
+		if 'free' in overrides: # passes without paying aps
+			return self.runScan(overrides)
+			
+		if self.ap_pay('scan' + params) == True:
+			pass
+		else:
+			return dialogmethods.cantPerform() # can't perform action	
+		
+		# does nothing
 
+		return self.runScan(overrides)
+		
+	def runScan(self,overrides):
+		"""Does the hard work of determining which objects are in view; communicates this to the faction."""
+		
+		print(str(self) + ' is scanning...')
+		
+		dist = mapmethods.distance
+		pos = self.pos()
+		
+		for sensor in range(len(self.states['sensors'])):															# picks one by one all mounted sensors
+			model, number, quality, maxdist, chanceatmax, specialattrs = self.states['sensors'][sensor]	
+			#('basic_sensor',1,1	,6		,2,				[])
+			if 'lazy' in overrides:
+				maxdist = 3
+				chanceatmax = 0.7
+				number = 1
+				perceivables = self.perceivables(3)
+			else:
+				perceivables = self.perceivables() 
+			
+			objectsInRange = [ (dist(self.pos(),obj.pos()),obj) for obj in perceivables ]
+			
+			for numiters in range(number): 																# each sensor_array scans once per 
+																										# number of sensors mounted on the array
+				for target in objectsInRange:
+					targetdistance = target[0]
+					steps = maxdist
+					
+					chanceincrementperstep = 1.0 - (chanceatmax/10.0) # should be a positive float in (0,1]
+					if not 0 < chanceincrementperstep <= 1:
+						raise Exception('Something wrong : chanceincrementperstep = ' + str(chanceincrementperstep))
+					
+					distanceinsteps = float(targetdistance // steps) # how many steps there are in distance
+					target_chanceToBeSeen = 1.0 - (distanceinsteps * chanceincrementperstep) # the farther it is, the harder it is to see it
+					
+					if not 0 < target_chanceToBeSeen <= 1:
+						raise Exception('Something wrong : target_chanceToBeSeen = {},distanceinsteps = {} chanceincrementperstep = {}, steps = {}, distance = {} '.format(str(target_chanceToBeSeen),distanceinsteps,chanceincrementperstep,steps,targetdistance)  )
+					
+					target_chanceToBeSeen_final = target_chanceToBeSeen - target[1].visibility() # diminishes the chances by target's visibility factor
+					
+					if random.random() <= target_chanceToBeSeen: #  the harder to see it, the lower target_chancetobeseen is
+						self.states['faction'].see(target[1])
+						
+						print('perceived '+ str(target[1]) + ' at ' + str(targetdistance))
+						
+					else:
+						pass
+	
+	def ap_gain(self,what):
+		"""Rewards a ship with action points. If the operation is successful, returns True. Else, False."""
+		
+		selfAP = self.states['action_points']
+		
+		if what + selfAP >= 10: #### CAP
+			self.states['action_points'] = 10.0
+		else:
+			self.states['action_points'] += what
+			return True
+		
+	def ap_pay(self,what):
+		"""Makes a ship spend its aps for some action. If that is feasible (the cost can be paid), returns True; else, False."""
+		
+		selfAP = self.states['action_points']
+		
+		prices = {	'scanlong' : 2.0,
+					'move1':1.0,
+					'move2': 1.5,
+					'warp':10.0,
+					'attack':8.0,
+					'battle':10.0}
+		
+		if isinstance(what,float): # tries to pay what.
+			cost = what
+			pass
+		elif what in list(prices.keys()):
+			cost = prices[what]
+		else:
+			raise Exception('Bad input for ap_pay: received {} {}'.format(self,what))
+			
+			
+		if cost <= selfAP:
+			self.states['action_points'] -= cost
+			return True
+		
+		else:
+			return False
+		
+		

@@ -6,8 +6,10 @@ from math import sqrt
 import objectmethods
 import utilityfunctions
 import namegenmethods
+import factionmethods
 
-
+GOD = 'god_override'
+ 
 def createMapCode(height = 40,width = 100,asteroidratio = 0.04):  # default values for the whole game
 	"""Given height and width, plus optional asteroid ratio, produces a mapcode (randomized 0/1 matrix)."""	
 	
@@ -126,11 +128,13 @@ def distance(obj1,obj2):
 			try: 
 				pos = obj.states['position']	
 			except KeyError:
-				raise KeyError('Wrong input for distance function; received a ' + str(obj1,obj2))
+				raise KeyError('Wrong input for distance function; received a ' + str(obj1)+str(obj2))
 			return pos
 		elif isinstance(obj,tuple):
 			return obj
-		
+		else:
+			raise Exception('Unsupported object type: received ' + str(obj1)+str(obj2))
+	
 	obj1 = redef(obj1)
 	obj2 = redef(obj2)	
 	
@@ -241,13 +245,28 @@ def newMap(parameters = None):
 		newAsteroid = objectmethods.Sobject('asteroid',{'position':entry}) # the position is entry.
 		objectmethods.mapcode_tracker[entry] =  newAsteroid
 	
+	global GOD
+		
+	GOD = factionmethods.Faction(GOD)
+	
 	print('Newmap procedure completed. Welcome to sector '+str(objectmethods.map_specials[2]))	
 
-def topObjectAt(coordinates):
-	"""Returns the object in the top layer for that position."""
-
-	objectsatpos = [sobj for sobj in objectmethods.sobject_tracker if sobj.states.get('position') == coordinates]
-	asteroid =  objectmethods.mapcode_tracker.get(coordinates) #can be none
+def topObjectAt(coordinates,faction='god'):
+	"""Returns the object in the top layer for that position in the given dictionary."""
+	
+	if faction == 'god':
+		dictionary = objectmethods.sobject_tracker # all objects
+	else:
+		dictionary = faction.tracker
+		
+	objectsatpos = [sobj for sobj in dictionary if sobj.pos() == coordinates] # retrieves the objects in the faction's tracker
+	
+	if objectsatpos == []:
+		objectsatpos = faction.persistent_view.get(coordinates, []) # if there is an object in the persistent_view
+		if objectsatpos == []:
+			return None
+		else:
+			return objectsatpos
 
 	fleetsat = [fleet for fleet in objectsatpos if fleet.objectclass == 'fleet']
 	if fleetsat == []: 																			# LAYER 3
@@ -260,23 +279,32 @@ def topObjectAt(coordinates):
 		pass
 	else:
 		return utilityfunctions.mostPowerful(shipsat) # returns the most powerful
-
-	if asteroid != None: 																		# LAYERs 1-0
-		if asteroid.states.get('building') == None:
-			return asteroid  # if it is not built, returns itself.
-		else:
-			return asteroid.states['building'] # returns the building which is on it!
+	
+	building  = [astr for astr in objectsatpos if astr.objectclass == 'building'] 				# LAYER 1
+	if building != []:
+		return building[0] # there can be only one. thus...
+	
+	
+	asteroid = [astr for astr in objectsatpos if astr.objectclass == 'asteroid']				# LAYER 0
+	if asteroid != []:
+		if len(asteroid) != 1:
+			raise('Error: {} asteroids per square at {}'.format(len(asteroid),str(coordinates)))
+		return asteroid[0] # not a list anymore!
 	else:
-		return asteroid 																		# that is: None
+		return None																
 		
-def allObjectsAt(coordinates):
+def allObjectsAt(coordinates,dictionary='default'):
 	"""Returns all objects at the position."""
-	astr = objectmethods.mapcode_tracker.get(coordinates,[])
-	if astr != []:
-		astr = [astr]
-	return [obj for obj in objectmethods.sobject_tracker if obj.states.get('position') == coordinates] + astr
+	if dictionary == 'default':	
+		astr = objectmethods.mapcode_tracker.get(coordinates,[])
+		if astr != []:
+			astr = [astr]
+		return [obj for obj in objectmethods.sobject_tracker if obj.states.get('position') == coordinates] + astr
 		
-def map_brutal_dump(view = 'godview'):
+	else: # returns all objects in view at point
+		return dictionary[coordinates]
+	
+def map_brutal_dump(faction = 'godview'):
 	"""Brutally dumps the codes of all Sobjects existing in the universe."""
 	
 	if objectmethods.map_specials == None:
@@ -286,13 +314,14 @@ def map_brutal_dump(view = 'godview'):
 	
 	height,width,name = objectmethods.map_specials
 	
-	print('Brutal_Dump of ' + name)
+	print('Brutal_Dump of ' + name + ' pov : ' + str(faction))
 	
-	if view == 'godview':
-		pass
-	elif isinstance(view,factionmethods.Faction):
-		# something will happen here
-		pass
+	if faction == 'godview':
+		destinationDict = objectmethods.mapcode_tracker
+	elif isinstance(faction,factionmethods.Faction):
+		destinationDict = faction.view   	# retrieves the faction's view
+	else:
+		raise Exception('Bad bad bad.')	
 	
 	header = '    ' + '_'*(int(width/2) - 4) + name + '_'*(int(width/2) - 4)
 	print(header)
@@ -301,9 +330,9 @@ def map_brutal_dump(view = 'godview'):
 	for y in range(height): # y, height
 		line = '   |'
 		for x in range(width): # x, width
-			topobj = topObjectAt((x,y)) # does the hard work
+			topobj = topObjectAt((x,y),destinationDict) # does the hard work
 			
-			objectmethods.mapcode_tracker[(x,y)] = topobj # can be None or an object--- the mapcode_tracker tracks only VISIBLE TOP LAYER ITEMS
+			destinationDict[(x,y)] = topobj # can be None or an object--- the mapcode_tracker tracks only VISIBLE TOP LAYER ITEMS
 			
 			if topobj == None:
 				todisplay = ' '
@@ -318,36 +347,54 @@ def map_brutal_dump(view = 'godview'):
 	footer = '    ' + '_' *(width)
 	print(footer)
 
-def updatePoints(pos1, pos2 = None):
+def updatePoints(pos1, faction = 'god'):
 	"""Updates the mapcode register so as to keep track of small changes. Typical input can be oldposition, newposition of some moving object."""
-
-	if pos2 != None:
-		pointstoupdate = [pos1,pos2]
-	else:
-		if isinstance(pos1,list):
-			pointstoupdate = pos1
-		elif isinstance(pos1,tuple):
-			pointstoupdate = [pos1] # can be generalized to take also lists as input
-		else:
-			raise Exception('Bad input for updatePoints function; received {} and {}.'.format(str(pos1),str(pos2)))
 	
+	if  faction == 'god':
+		print("Updating god's eyes...")
+		faction = GOD  # the all-seeing I
+		dictionary = objectmethods.mapcode_tracker
+	else:
+		dictionary = faction.view
+	
+
+	if isinstance(pos1,list):
+		pointstoupdate = pos1
+	elif isinstance(pos1,tuple):
+		pointstoupdate = [pos1] # can be generalized to take also lists as input
+	else:
+		raise Exception('Bad input for updatePoints function; received {} and {}.'.format(str(pos1),str(pos2)))
+
 	for point in pointstoupdate:
 		if isinstance(point,tuple) != True or len(point) > 2:
-			raise Exception('Error here. received pointstoupdate :: ' +str(pointstoupdate) + ' where pos1 = {} and pos2 = {}'.format(str(pos1),str(pos2)))
-		objectmethods.mapcode_tracker[point] = topObjectAt(point)
+			raise Exception('Error here. received pointstoupdate :: ' +str(pointstoupdate))
+
+		dictionary[point] = topObjectAt(point,faction)
+		if dictionary[point] == None:
+			dictionary[point] = faction.persistent_view.get(point,None)
 	
-def map_smart_dump(view = 'godview'):
+	return None
+	
+def map_smart_dump(faction = 'godview'):
 	"""Tries to dump the map in an intelligent way. If there is no map, returns a message. If the map has not been brutal_dumped before, 
 	and the dictionary is thus too little, it brutal_dumps it automatically."""
 	
 	if objectmethods.map_specials == None:
 		return 'No map to be dumped.'
 
-	if len(objectmethods.mapcode_tracker) < objectmethods.map_specials[0] * objectmethods.map_specials[1] :
-	# i.e. if the map has never been brutal_dumped before
-		return map_brutal_dump(view)
-	# todo : when godview is off, the visualized map depends on the player who calls the brutal-dump
+#	if len(objectmethods.mapcode_tracker) < objectmethods.map_specials[0] * objectmethods.map_specials[1] :
+#		return map_brutal_dump(view)
 	
+	if faction != 'godview':
+		# view is then a faction's view property.
+		dictionary = faction.view
+	elif faction == 'godview':
+		global GOD
+		dictionary = GOD.view
+	
+	#if dictionary == {}:
+	#	return map_brutal_dump(faction) # the first time requires a brutal dump
+		
 	height,width,name = objectmethods.map_specials
 	
 	print('smart_dump of ' + name)
@@ -360,7 +407,7 @@ def map_smart_dump(view = 'godview'):
 		line = '   |'
 		for x in range(width): # x, width
 		
-			topobj = objectmethods.mapcode_tracker[(x,y)] # retrieves the object from the precompiled mapcode_tracker!
+			topobj = dictionary.get((x,y)) # retrieves the object from the dictionary!
 			
 			if topobj == None:
 				todisplay = ' '

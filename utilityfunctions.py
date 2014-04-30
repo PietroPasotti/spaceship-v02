@@ -21,7 +21,7 @@ def roll(x):
 			return 0
 		
 		return num
-
+ 
 def canAttackers(listofships):
 	return [ship for ship in listofships if ship.states['can_attack'] == True]
 	
@@ -203,8 +203,7 @@ def determinemodifiedvalues(dictionary):
 	return dictionary
 
 def randomasteroid():
-	allplots = [ astr for astr in objectmethods.sobject_tracker if astr.objectclass == 'asteroid' and astr.states['building'] == None ]
-	return random.choice(allplots)
+	return random.choice(list(objectmethods.mapcode_tracker.values()))
 
 def approx(point,threshold,oclass):
 	"""Returns as a list the sobjects of objectclass oclass which are within distance threshold from the give point."""

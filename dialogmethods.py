@@ -154,7 +154,7 @@ def sensorsOptions(sobject,objectclass):
 	else:
 		raise Exception('Unrecognised objectclass : ' + objectclass)
 	
-	
+	 
 def surroundingsActionsOptions(sobject,objectclass):
 	"""Return options for surrounding objects. 
 	1 - retrieves the surrounding objects (in a range of, say, 10 squares)

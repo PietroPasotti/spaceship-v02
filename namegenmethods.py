@@ -11,9 +11,11 @@ philosophical_adjectives = """Wittgensteinian Nietzschean Hegelian Marxian Lenin
 common_nouns = """Bed Sword House Glass Word Sentence Poem Crop Field Plant Grass Leaf Tree Vase Cushion Pillow Napkin Newspaper Tabloid Character Duvet Sun Moon Star Ceiling Floor Constellation Letter Postcard Blossom Sky Ocean Land Earth Ground Hill Heart Pancreas Colon Brain Skull Wallpaper Plane Wing Gull Feather Father Mother Sister Daughter Son Uncle Nephew Niece Barbarian Warrior Druid""".split(' ')
 
 philosophical_nouns = """Ludwig Karl Friedrich Gustav August Austin Schiller John-Stuart Abelard JohnBuridan SaintThomas Plato Socrates Aristoteles""".split(' ')
+philosophical_nouns.extend( """Trinity Morpheus Neo AgentSmith""".split(' ') )
 
 animal_nouns = """Gorilla Lion Zebra Tiger Cat Dog Cheetah Eagle Sparrow Whale Dolphin Human Alien SeaLion Seal Gundam Horse Donkey Mule Camel""".split(' ')
-
+animal_nouns.extend( """Tarrasque Dragon Lizard Orc Ogre OgreMagi PurpleWorm Turtle""".split(' ') )
+ 
 def namegen(kwarg=None):
 	
 	name = ''

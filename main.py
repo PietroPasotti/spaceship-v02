@@ -14,9 +14,10 @@ b = Sobject('ship',{'shipclass':'mothership', 'position':(15,15)})
 
 c = Sobject('ship',{'shipclass':'fighter', 'position':(13,12)})
 
-d = Sobject('fleet',{'shiplist':['fighter','destroyer','cruiser','swarmer',b], 'position':(20,20)})
+#d = Sobject('fleet',{'shiplist':['fighter','destroyer','cruiser','swarmer',b], 'position':(20,20)})
 
-e = Sobject('fleet',{'shiplist':['fighter','fighter','destroyer','cruiser','mothership'], 'position' :(22,23)})
+#e = Sobject('fleet',{'shiplist':['fighter','fighter','destroyer','cruiser','mothership'], 'position' :(22,23)})
+
 
 a.attack(b)
 b.attack(c)
@@ -25,9 +26,13 @@ a.attack(c)
 
 newMap()
 
-me = factionmethods.Faction()
-you = factionmethods.Faction()
+mapmethods.GOD.god_spawn([a,b,c])
 
+
+me = factionmethods.Faction()
+me.initFaction(None,False)
+you = factionmethods.Faction()
+you.initFaction(None,False)
 map_smart_dump()
 
 
