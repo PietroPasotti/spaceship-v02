@@ -18,6 +18,14 @@ class Faction(object):
 		self.states['base'] = None
 		self.states['buildings'] = []
 		self.states['fleets'] = []
+		self.states['allies'] = []
+		self.states['hostiles'] = []
+		
+		self.asteroidlist = [] 	# keeps track of all ever perceived asteroids, unmodifiable
+		self.objectlist = [] # all other objects, modifiable
+		
+		self.view = {} # keeps precompiled copy of asteroid_tracker,plus all objects (not yours) which you have perceived
+	
 		
 		if options != {}: 	# if we provide some custom options
 			bol = False 	# we won't be prompted to get random ones
@@ -39,7 +47,10 @@ class Faction(object):
 	
 	def initFaction(self,options,bol):
 		"""Essential values are name,base,ships."""
-			
+		
+		if objectmethods.mapcode_tracker == {}:
+			raise Exception("can't initialize without a ground mapcode.")
+		
 		print('Faction initializer prompted...')	
 		if bol == True:
 			if input('Do you want to automatically generate a random one? [Y/n]: ') in 'Yesyes':
@@ -87,8 +98,6 @@ class Faction(object):
 		for ship in self.states['ships']:
 			self.states['base'].spawn(ship)
 				
-		
-
 	def initrandomZero(self):
 		self.states['name'] = namegenmethods.namegen('F')
 		self.states['base'] = objectmethods.Sobject('building',{'buildingclass':'base', 
@@ -104,3 +113,48 @@ class Faction(object):
 	def buildings(self):
 		return self.states['buildings']
 
+	def allMyObjects(self):
+		"""Returns a faction's complete objectlist."""
+		
+		ships = self.states['ships']
+		base = self.states['base']
+		buildings = self.states['buildings'] 
+		#fleets = self.states['fleets'] 	
+		
+		allList = ships + buildings + [base]
+		
+		return allList
+
+	def see(self,obj):
+		"""Adds the object to the faction's view."""
+		
+		if isinstance(obj,objectmethods.Sobject) != True:
+			raise Exception('Wrong. Received a non-sobject: ' +str(obj))
+		
+		if obj.objectclass == 'asteroid':
+			if obj in self.asteroid_tracker: # if it's already there.
+				return None
+			else:
+				self.asteroid_tracker[i.pos()] = i #  will never be touched again
+				self.view.append(obj)
+		else:
+			self.view.append(obj)
+			
+		return None
+
+	def updateView(self):
+		"""Tells the faction to see all of his own objects, and to see all they can see."""
+		for i in self.allMyObjects():
+			self.see(obj)
+		
+		for a in self.asteroid_tracker:
+			self.see(asteroid)
+		
+		mapmethods.map_smart_dump(self.view)
+		
+	def shareview(self,otherfaction):
+		"""Gives an ally (or a hostile, btw) the possibility to see a snapshot of his own view."""
+		
+		for key in self.view:
+			otherfaction.see(self.view[key])
+		
