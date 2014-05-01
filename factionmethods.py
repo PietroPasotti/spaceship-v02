@@ -12,43 +12,49 @@ class Faction(object):
 	
 	def __init__(self,options = {}):
 		
-		if options == 'god_override':
-			self.view = objectmethods.mapcode_tracker
-			self.persistent_view = objectmethods.mapcode_tracker
-			self.tracker = objectmethods.sobject_tracker
-			print("God is born. And is a factionmethods.faction instance.")
-			
-			return None
-		
-		
-		self.states = {}
+		global existing_factions		
 
+		self.states = {}
+		
+		self.states['name'] = 'Noname'
+		
 		self.states['ships'] = []
 		self.states['base'] = None
 		self.states['buildings'] = []
 		self.states['fleets'] = []
 		self.states['allies'] = []
 		self.states['hostiles'] = []
+
+		if options == 'god_override':
+			existing_factions.extend([self])
+			return self.initGodMode()
 		
 		self.view = {}          # snapshot of what you currently see. smartly updated
 		self.persistent_view = {} # snapshot of one-shot perceived objects such as enemies
 		self.tracker = [] 		# keeps track of all objects which you have perceived. smartly updated
-		#self.tracker = [] 	# keeps track of all objects which you perceive continuously, without positions
 		
 	
 		if options != {}: 	# if we provide some custom options
 			bol = False 	# we won't be prompted to get random ones
 		else:
 			bol = True 
-		
-		#self.initFaction(options,bol) # will update the states dictionary and spawn the first things
-		
-		global existing_factions
+			
 		existing_factions.extend([self])
-	
+		
+	def name(self):
+		return self.states['name']
+		
 	def __str__(self):
 		
 		return 'faction {}; with base at {}, and a fleet of {} ships.'.format(self.states['name'],self.states['base'],len(self.states['ships']))
+	
+	def initGodMode(self):
+		
+		self.view = objectmethods.mapcode_tracker
+		self.persistent_view = objectmethods.mapcode_tracker
+		self.tracker = objectmethods.sobject_tracker
+		self.states['name'] = 'GOD'
+		print("God is born. And is a factionmethods.faction instance.")
 	
 	def initFaction(self,options=None,bol=True):
 		"""Essential values are name,base,ships."""
@@ -212,11 +218,12 @@ class Faction(object):
 					for sobject in params:
 						sobject.states['position'] = utilityfunctions.randomasteroid().pos()
 						sobject.states['faction'] = self
+						self.states['ships'].append(sobject)
 				else:
 					shiplist = params
 					position = utilityfunctions.randomasteroid().pos()
 					newfleet = objectmethods.Sobject('fleet',{'shiplist':shiplist, 'position':position,'faction':self})					
-						
+					self.states['fleets'].append(newfleet)
 
 			elif isinstance(params[0],str):
 				# try passing the string as a shiplist of a fleet initializer

@@ -4,9 +4,13 @@ import objectmethods, namegenmethods, utilityfunctions, mapmethods,dialogmethods
 from objectmethods import Sobject
 from mapmethods import newMap, map_smart_dump
 
-# dialogmethods.init()
-# dialogmethods.Start()
-# dialogmethods.DisplayEndScreen()
+def clear_all():
+	factionmethods.existing_factions = []
+	objectmethods.mapcode_tracker = {}
+	mapmethods.sobject_tracker = []
+	objectmethods.map_specials = None
+	mapmethods.GOD = None
+	
 
 a = Sobject('ship',{'position':(15,15)})
 
@@ -35,6 +39,7 @@ you = factionmethods.Faction()
 you.initFaction(None,False)
 map_smart_dump()
 
+menu = dialogmethods.InteractiveMenu()
 
 
 

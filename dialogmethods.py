@@ -2,235 +2,268 @@
 from namegenmethods import namegen
 import objectmethods
 import random
+import factionmethods
+import mapmethods
+import utilityfunctions
+
 
 class DialogError(Exception):
 	def __init__(self,parent):
 		super().__init__(parent)
 
+currentmenu = None
+currentscreen = None
 
 menu_tracker = []
 
+TREE = """
+faction_mainMenu:
+			_save_
+			_load_
+			_scores_
+			_credits_
+			_ingameMenu_:		
+					factionOptions:
+								itemPicker(allies):
+										allies_mainMenu:
+								itemPicker(hostiles):
+										hostiles_mainMenu:
+								diplomacyOptions:
+								subterfuges:
+								strategy:
+								
+					itemPicker(fleets) == itemPicker(ships):
+								printStatus
+								_(move)_
+								_(attackOptions -m)_
+								sensorsOptions -m
+								_give orders_
+								surroundingsActionsOptions
+								_(spawn)_
+																
+					itemPicker(buildings):
+								_(spawn)_
+								sensorsOptions -m
+												
 
 
-def printOptions(dictionary):
-	
-	menu_tracker.append(dictionary) # keeps track of what's displayed
-	
-	if isinstance(dictionary,dict) == False:
-		raise DialogError('dictionary is not a dictionary but a ' + str(type(dictionary)))
-	
-	for key in dictionary:
-		description = dictionary[key][0]
-		print('   ' + str(key) + ' > ' + description)
-	
-	print('\n')  											# 'b'	 back, protected choice character
-	dictionary['b'] = ('Back', menu_back)
-	description = dictionary['b'][0]
-	print('     ' + 'b' + ' >> ' + description)
-	
-	choice = ''
-	while choice not in dictionary.keys():
-		choice = input("Choose from the available options {}".format(dictionary.keys()))
-		if choice in dictionary.keys():
-			break
-	if len(dictionary[choice]) == 2:
-		return dictionary[choice][1]() # function with no argument
-	elif len(dictionary[choice]) == 3:
-		return dictionary[choice][1](dictionary[choice][2]) # apply 1 to 2
-	elif len(dictionary[choice]) == 4:
-		return dictionary[choice][1](dictionary[choice][2]), dictionary[choice][3]() # 1 argument to the first, calls the second
 
 
-def printContent(dictionary):
-	"""Just displays a dictionary of choices, with no interactivity whatsoever."""
-	header = "         Displaying contents "
-	print(header)
-	for key in dictionary:
-		print(">>>  {}  ::  {}".format(key,str(dictionary[key])))
-	
-	return None
+"""
 
-
-def menu_back():
-	menu = menu_tracker # list
-	menu.reverse()
-	lastitem = menu[0]
-	menu.remove(lastitem)
-	menu.reverse()
-	#return printOptions(lastitem)
-
-
-def faction_mainMenu(faction):
+class InteractiveMenu():
 	
-	faction_main = {'1':('Save(not yet implemented)',print, 'not yet implemented'),
-				'2':('Load(not yet implemented)',print, 'not yet implemented'),
-				'3':('Faction Options', printOptions, faction_factionOptions(faction) ),	
-				'4':('Your fleets',printOptions, faction_itemPicker(faction,'fleets' ) ),
-				'5':('Your ships',printOptions, faction_itemPicker(faction,'ships' ) ),
-				'6':('Your buildings',printOptions, faction_itemPicker(faction,'buildings' ) ),
-				'7':('Your scores(not yet implemented)',print, 'not yet implemented')
-																			}
-	return faction_main
-
-def faction_factionOptions(faction):
-	
-	choicedict = {'1':('Allies',printOptions, faction_itemPicker(faction,'allies' ) ),
-				'2':('Hostiles',printOptions, faction_itemPicker(faction,'hostiles' ) ),
-				'3':('Diplomacy screen', printOptions, faction_diplomacyOptions(faction) ),	
-				'4':('Subterfuges',printOptions, faction_itemPicker(faction,'fleets' ) ),
-				'5':('Strategic Options',printOptions, faction_strategy(faction) )	
-					
-					}
-	
-	
-	return
-
-def faction_diplomacyOptions(faction):
-	"""Returns choicedict of available diplomacy options."""
-	
-	diplomacy_faction = {'1':('Bribe (nyi)',print, 'not yet implemented'),
-				'2':('Pretend (nyi)',print, 'not yet implemented') }	
-	
-	return diplomacy_faction
-	
-
-def faction_itemPicker(faction,objectclass): # params : ships, fleets, allies, hostiles, all, buildings
-	
-	if objectclass == 'ships':
-		objectlist = faction.states['ships']
-		function = ship_mainMenu
-	elif objectclass == 'buildings':
-		objectlist = faction.states['buildings']
-		function = building_mainMenu
-	elif objectclass == 'fleets':
-		objectlist = faction.states['fleets']
-		function = fleet_mainMenu
-	elif objectclass == 'allies':
-		objectlist = faction.states['allies']
-		function = allies_mainMenu
-	elif objectclass == 'hostiles':
-		objectlist = faction.states['hostiles']
-		function = hostiles_mainMenu
-	elif objectclass == 'all': # literally all objects
-		objectlist = objectmethods.sobject_tracker
-		function = all_mainMenu
-	else:
-		raise DialogError('Unexpected input(s) for faction_itempicker dictionary builder : ' + str(faction) + str(objectclass))
-	
-	counter = 1
-	choicedict = {}
-	
-	if objectlist == []:
-		choicedict[''] = ('The chosen objectlist is empty: You have no ' + objectclass,  menu_back )
-	
-	else:	
-		for obj in objectlist:
-			choicedict[str(counter)] = (str(obj), printOptions, function(obj))
-			counter += 1
-			
-	return printOptions(choicedict)
-
-def attackOptions(sobject,objectclass):
-	"""Fundamental one."""
-	
-	print('yet; nope.')
-	return menu_back	
-
-def fleet_mainMenu(fleet):
-	
-	print('header :: '+ ' fleet ' +str(fleet) + ' selected.')
-	faction_main = {'1':('Status',printStatus, fleet),
-				'2':('Move',print, 'not yet implemented'),
-				'3':('Attack', printOptions, attackOptions(fleet,'fleet') ),	
-				'4':('Sensors',printOptions, sensorsOptions(fleet,'fleet') ),
-				'5':('Give orders (not yet implemented)',print, 'not yet implemented'),
-				'6':('Surroundings-Options', surroundingsActionsOptions(fleet,'fleet'))
-				#'7':('Back',faction_itemPicker, fleet.states['faction'])
-																			}
-	return faction_main
-
-
-def sensorsOptions(sobject,objectclass):
-	"""Returns options for the sensors of a fleet, a ship or a building."""
-	if objectclass == 'fleet':
-		choicedict = { 	'1' : ('Long range scan with whole fleet [4ap] ', sobject.scan, 'long'),
-						'2' : ('Quick scan with best ship [2ap] ', sobject.scan, 'best' ),
-						'3' : ('Display status of available sensors', printContent, sobject.scan('returnSensorsDict'))
-							}
-		return choicedict
-	elif objectclass == 'ship':
-		choicedict = { 	'1' : ('Long range scan [2ap] ', sobject.scan, 'long'),
-						'2' : ('Display status of available sensors', printContent, sobject.scan('returnSensorsDict'))
-							}
-		return choicedict
-	
-	elif objectclass == 'building':
-		choicedict = { 	'1' : ('Long range scan [2ap] ', sobject.scan, 'long'),
-						'2' : ('Display status of available sensors', printContent, sobject.scan('returnSensorsDict'))
-							}
-		return choicedict
-	else:
-		raise Exception('Unrecognised objectclass : ' + objectclass)
-	
-	 
-def surroundingsActionsOptions(sobject,objectclass):
-	"""Return options for surrounding objects. 
-	1 - retrieves the surrounding objects (in a range of, say, 10 squares)
-	2 - you choose one
-	3 - you choose what to do with it"""
-	
-def allies_mainMenu(faction):
-	"""Allies mainmenu."""
-	print('nope.')
-	return menu_back
-	
-def hostiles_mainMenu(faction):
-	"""Hostiles mainmenu."""
-	print('nope.')
-	return menu_back
-
-def faction_strategy(faction):
-	"""Strategies mainmenu."""
-	print('nope.')
-	return menu_back	
-
-def printStatus(sobject):
-	if isinstance(sobject,objectmethods.Sobject) == False:
-		raise DialogError('Unexpected input. Sobject needed, got ' +type(sobject) + ' instead.')
-	
-	todisplay = sobject.states
-	
-	if len(todisplay) > 20:
-		print('Too many values to display. Showing them in compact form instead.')
-		# does nothing
+	def __init__(self):
 		
-	for key in todisplay:
-		print('   ' + str(key) + '  :  ' + str(todisplay[key]))
+		print('Initializing InteractiveMenu...')
+		
+		global currentmenu
+		currentmenu = self
+		
+		INIbody = [('0',("Bind Faction","self.bindFaction()")),
+					('1',("Hi Pussy","print('Hi, Pussy.')"))]
+		
+		self.menuHistory = []
+							
+		self.screen = MenuScreen('choice','init', INIbody)  #(self,mode,tag,body,number = None):
+		
+		self.showScreen()
+		
+	def __str__(self):
+		return self.screen.tag
 	
-	return None
+	def __repr__(self):
+		menulist = [screen for screen in self.menuHistory]
+		rep = ''
+		for i in menulist:
+			rep = rep + " -> " + i.tag
 
-def building_mainMenu(building):
+		return "[{}]".format(rep)
+		
+	def showScreen(self,options = []):
+		
+		print(repr(self))
+		print("Now displaying :: " + self.screen.tag)
+		print('     '+('-'*100))
+		choicedict = {}
+		for voice in self.screen.body:
+			line = "  {}   >>   {}".format(voice[0],voice[1][0])
+			print(line)
+			choicedict[voice[0]] = voice[1][1]
+		print('     '+('-'*100))
+		
+		while True:
+			IN = input("Choose :: = ")
+			
+			if IN not in [choice for choice in list(choicedict.keys())]:
+				print("Bad input, asshole. Possible choices are: " + str(list(choicedict.keys())))
+				pass
+			else:
+				break
+		
+		print("Executing order... Mode is "+str(self.screen.mode))
+		
+		choice = choicedict[IN]
+		
+		if self.screen.mode == 'grab': # e.g. for itempick functions
+			return choice
+			
+		elif self.screen.mode == 'choice':		
+			try:
+				return exec(choice)
+			except TypeError:
+				print(self.screen.body,self.screen.tag,self.screen.mode)
+				raise DialogError("BAD. Received " + str(choice) + 'which is a {}'.format(type(choice)))
+		else:
+			raise DialogError('What?')
+
+	def close(self):
+		return None
 	
-	print('header :: ' +str(building) + ' selected.')
-	faction_main = {'1':('Status',printStatus, building),
-				'2':('Move',print, 'not yet implemented'),
-				'3':('Attack', printOptions, attackOptions(building,'building') ),	
-				'4':('Sensors', printOptions, sensorsOptions(building,'building') ),
-				'5':('Give orders (not yet implemented)',print, 'not yet implemented'),
-				'6':('Surroundings-Options', surroundingsActionsOptions(building,'building'))
-				#'7':('Back',faction_itemPicker, building.states['faction'])
-																			}
-	return faction_main	
+	def setupScreen(self,mode,tag,voiceslist,number=None):
+		"""Creates a new screen with the given parameters and sets it as its current screen."""
+		
+		if number == None:
+			number = self.curNumber()
+		
+		if voiceslist == None:
+			raise DialogError('Bad. My input was : ' + str(self) + str(tag) + str(number) +str(voiceslist))
+		
+		newScreen = MenuScreen(mode,tag,voiceslist,number)
+		self.screen = newScreen		
+
+	def curNumber(self,keyarg = None):
+		
+		if keyarg == 'grabber':
+			
+			return len(self.menuHistory)
+			
+		else:
+			return len(self.menuHistory)
+			
+	def itemPick(self,keyarg):
+		"""Returns a **Sobject**."""
+		
+		if keyarg == 'faction':
+			choicelist = factionmethods.existing_factions
+			
+		elif keyarg == 'ship':
+			choicelist = [ item for item in objectmethods.sobject_tracker if item.objectclass == 'ship' ]
+			
+		elif keyarg == 'fleet':
+			choicelist = [ item for item in objectmethods.sobject_tracker if item.objectclass == 'ship' ]
+		
+		else:
+			raise DialogError('Unknown input: {}'.format(keyarg))		
+			
+		availableitems = []
+		counter = 0
+			
+		for faction in choicelist:             							# generates the list of items
+			values = (str(counter),(str(faction.name()) , faction))		# this assumes the object has a .name() method!
+			counter += 1
+			availableitems.append(values)
+			 #(self,mode,tag,body,number = None):
+			 
+		self.setupScreen('grab','{}_itemPick'.format(keyarg),availableitems)
+		self.screen.mode = 'grab' # redundant, but...
+		picked_object = self.showScreen() # returns a value!!
+		
+		return picked_object
 	
-def ship_mainMenu(ship):
+	def bindFaction(self,faction = None):
+		"""Ties the Menu to some faction."""
+		
+		if faction == None:
+
+			faction = self.itemPick('faction') 
+		
+		self.faction = faction 					# ties the menutree with the faction
+		self.factionMenu()
 	
-	print('header :: ' +str(ship) + ' selected.')
-	faction_main = {'1':('Status',printStatus, ship),
-				'2':('Move',print, 'not yet implemented'),
-				'3':('Attack', printOptions, attackOptions(ship,'ship') ),	
-				'4':('Sensors',printOptions, sensorsOptions(ship,'ship') ),
-				'5':('Give orders (not yet implemented)',print, 'not yet implemented'),
-				'6':('Surroundings-Options', surroundingsActionsOptions(ship,'ship'))
-				#'7':('Back',faction_itemPicker, ship.states['faction'])
-																			}
-	return faction_main	
+	def factionMenu(self,options = []):
+		"""Displays the menu of choices available to a faction."""
+		
+		factionchoicemenu = [
+			# code  name   function 
+			(  '1'   		,(  "_save_"		,	"savemethods.save()"		)),			
+			(  '2'   		,(  "_load_"		,	"savemethods.load()"		)),			
+			(  '3'   		,(  "_scores_"		,	"self.scoresScreen()"		)),			
+			(  '4'   		,(  "_credits_"		,	"self.creditsScreen()"		)),			
+			(  '5'   		,(  "_ingameMenu_"	,	"self.inGameMainMenu()"		)),
+			(  '6'   		,(  "Back"	,	"self.Back()"		))]
+		
+		
+		self.setupScreen('choice','faction Menu',factionchoicemenu)  #(self,mode,tag,body,number = None):
+		
+		self.showScreen()
+		
+	def inGameMainMenu(self):
+		ingamemainmenu = [
+			# code  name   function 
+			(  '1'   		,(  "_save_"		,	"savemethods.save()"		)),			
+			(  '2'   		,(  "_load_"		,	"savemethods.load()"		)),			
+			(  '3'   		,(  "_scores_"		,	"self.scoresScreen()"		)),			
+			(  '4'   		,(  "_credits_"		,	"self.creditsScreen()"		)),			
+			(  '5'   		,(  "_ingameMenu_"	,	"self.inGameMainMenu()"		)),
+			(  '6'   		,(  "Back"	,	"self.Back()"		))]
+			
+			
+		self.setupScreen('choice','ingame Main Menu',ingamemainmenu) #(self,mode,tag,body,number = None):
+		
+		self.showScreen()		
+
+	def Back(self):
+		
+		self.menuHistory.remove(self.screen) # clean menuhistory
+		self.screen = self.screen.previousscreen
+		
+		if self.screen.mode == 'grab':
+			print('Trying to resume a grabber optionsMenu... What was the parent doing?')
+				
+			print("Going back to previousmenu's previousmenu instead.")
+			self.menuHistory.remove(self.screen)
+			self.screen = self.screen.previousscreen
+			
+			if self.screen.mode == 'grab':
+				print('Another grabber. Go back to the previous menu.')
+				self.menuHistory.remove(self.screen)
+				self.screen = self.screen.previousscreen
+		
+		self.showScreen()
+
+
+class MenuScreen():
+	
+	def __init__(self,mode,tag,body,number = None):
+		
+		if not isinstance(mode,str) or not isinstance(tag,str) or not isinstance(body, list):
+			
+			raise DialogError('Bad. Interrupt. My input was: {} {} {}'.format(mode,tag,body) )
+		
+		currentmenu.menuHistory.append(self)
+		
+		self.body = body
+		self.tag = tag
+		self.mode = mode # modes are: choice, grab
+		
+		if number == None:
+			if self.mode == 'grab':
+				number = len(currentmenu.menuHistory)
+			else:
+				number = len(currentmenu.menuHistory) + 1
+			
+		self.number = number
+		
+		global currentscreen
+		
+		if currentscreen is None:
+			self.previousscreen = self				# previous is self
+		else:
+			self.previousscreen = currentscreen 	# previous becomes current
+			
+		currentscreen = self					 	# current becomes self
+
+
+
+

@@ -69,7 +69,10 @@ class Sobject(object):
 		
 	def __repr__(self):
 		return str(self.states) + str(self.objectclass)
-			
+	
+	def name(self):
+		return self.states['name']		
+	
 	def initShip(self,specialattrs):
 		"""Initializes the object as a ship."""
 		self.states['shipclass'] = specialattrs.get('shipclass', 'fighter') # tries to get the specialattr 'shipclass'; otherwise it's a fighter
@@ -1015,6 +1018,7 @@ class Sobject(object):
 					
 					if random.random() <= target_chanceToBeSeen: #  the harder to see it, the lower target_chancetobeseen is
 						self.states['faction'].see(target[1])
+						objectsInRange.remove(target)
 						
 						print('perceived '+ str(target[1]) + ' at ' + str(targetdistance))
 						
