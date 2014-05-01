@@ -41,9 +41,23 @@ def printOptions(dictionary):
 		return dictionary[choice][1](dictionary[choice][2]), dictionary[choice][3]() # 1 argument to the first, calls the second
 
 
+def printContent(dictionary):
+	"""Just displays a dictionary of choices, with no interactivity whatsoever."""
+	header = "         Displaying contents "
+	print(header)
+	for key in dictionary:
+		print(">>>  {}  ::  {}".format(key,str(dictionary[key])))
+	
+	return None
+
+
 def menu_back():
-	previousmenu = menu_tracker[len(menu_tracker)-1]
-	return printOptions(previousmenu)
+	menu = menu_tracker # list
+	menu.reverse()
+	lastitem = menu[0]
+	menu.remove(lastitem)
+	menu.reverse()
+	#return printOptions(lastitem)
 
 
 def faction_mainMenu(faction):
@@ -83,19 +97,19 @@ def faction_diplomacyOptions(faction):
 def faction_itemPicker(faction,objectclass): # params : ships, fleets, allies, hostiles, all, buildings
 	
 	if objectclass == 'ships':
-		objectlist = self.states['ships']
+		objectlist = faction.states['ships']
 		function = ship_mainMenu
 	elif objectclass == 'buildings':
-		objectlist = self.states['buildings']
+		objectlist = faction.states['buildings']
 		function = building_mainMenu
 	elif objectclass == 'fleets':
-		objectlist = self.states['fleets']
+		objectlist = faction.states['fleets']
 		function = fleet_mainMenu
 	elif objectclass == 'allies':
-		objectlist = self.states['allies']
+		objectlist = faction.states['allies']
 		function = allies_mainMenu
 	elif objectclass == 'hostiles':
-		objectlist = self.states['hostiles']
+		objectlist = faction.states['hostiles']
 		function = hostiles_mainMenu
 	elif objectclass == 'all': # literally all objects
 		objectlist = objectmethods.sobject_tracker
@@ -116,7 +130,11 @@ def faction_itemPicker(faction,objectclass): # params : ships, fleets, allies, h
 			
 	return printOptions(choicedict)
 
-
+def attackOptions(sobject,objectclass):
+	"""Fundamental one."""
+	
+	print('yet; nope.')
+	return menu_back	
 
 def fleet_mainMenu(fleet):
 	
@@ -161,8 +179,20 @@ def surroundingsActionsOptions(sobject,objectclass):
 	2 - you choose one
 	3 - you choose what to do with it"""
 	
+def allies_mainMenu(faction):
+	"""Allies mainmenu."""
+	print('nope.')
+	return menu_back
 	
+def hostiles_mainMenu(faction):
+	"""Hostiles mainmenu."""
+	print('nope.')
+	return menu_back
 
+def faction_strategy(faction):
+	"""Strategies mainmenu."""
+	print('nope.')
+	return menu_back	
 
 def printStatus(sobject):
 	if isinstance(sobject,objectmethods.Sobject) == False:
@@ -197,10 +227,10 @@ def ship_mainMenu(ship):
 	print('header :: ' +str(ship) + ' selected.')
 	faction_main = {'1':('Status',printStatus, ship),
 				'2':('Move',print, 'not yet implemented'),
-				'3':('Attack', printOptions, attackOptions(ship) ),	
-				'4':('Sensors',printOptions, fleet_sensorsOptions(ship) ),
+				'3':('Attack', printOptions, attackOptions(ship,'ship') ),	
+				'4':('Sensors',printOptions, sensorsOptions(ship,'ship') ),
 				'5':('Give orders (not yet implemented)',print, 'not yet implemented'),
-				'6':('Surroundings-Options', fleet_surroundingsActionsOptions(ship))
+				'6':('Surroundings-Options', surroundingsActionsOptions(ship,'ship'))
 				#'7':('Back',faction_itemPicker, ship.states['faction'])
 																			}
 	return faction_main	
