@@ -4,6 +4,25 @@ import objectmethods, namegenmethods, utilityfunctions, mapmethods,dialogmethods
 from objectmethods import Sobject
 from mapmethods import newMap, map_smart_dump
 
+def basetest():
+	dm = dialogmethods
+	ms = dm.masterscreen
+	f = dm.Action(print,["hello","world"],2,None,'Print hello world thrice')
+	ms.addToBody(f)
+	f = dm.Action(print,["hello","world"],9,None,'Print hello world nine times')
+	ms.addToBody(f)
+	f = dm.Action(print,["hello","world"],1,'once','Print hello world once,tagged')
+	ms.addToBody(f)
+	f = dm.Action(print,["hello","world"],2,"thrice",'Print hello world thrice,tagged')
+	ms.addToBody(f)
+	ms.printer.display()
+	a.warp(b.pos(),['override'])
+	a.heal(1,['max','override'])
+	b.heal(1,['max','override'])
+	f = dialogmethods.Action(a.attack,[b],1,'ab',"a attacks b")
+	ms.addToBody(f)
+
+
 def clear_all():
 	factionmethods.existing_factions = []
 	objectmethods.mapcode_tracker = {}
@@ -43,5 +62,5 @@ you.initFaction(None,False)
 map_smart_dump()
 
 
-
+basetest()
 

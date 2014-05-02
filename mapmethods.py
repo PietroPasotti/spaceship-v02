@@ -93,16 +93,6 @@ def propagate2(mapcodeheightwidth,threshold=0.3,numiters=3):     # default value
 	croppedRounded_MAPCODE['specials'] = (height,width,namegenmethods.namegen('a'))
 	
 	return croppedRounded_MAPCODE
-def findfactor(dimension,number):
-	"""Returns how many times number is in dimension."""
-	
-	number = sqrt(number ** 2)
-	counter = 0	
-	while dimension < number:
-		number -= dimension
-		counter += 1
-			
-	return counter
 def pruneDestroyed(Listofobjects):
 	"""Removes all destroyed ships from a listof ships or from a Fleet's shiplist, and possibly destroys them.
 	If the fleet gets empty by doing this, removes the Fleet as well from its map.
@@ -153,7 +143,6 @@ def curMapSizes(kwarg = None):
 	else:
 		return objectmethods.map_specials
 	
-
 def orthogonals(sobject,string):
 	"""Returns the rightmost point IN THE MAP BOUNDARIES w.r.t. the given sobject."""
 	
@@ -192,11 +181,11 @@ def torusize(pos):
 	X,Y = pos # should be a tuple.
 	
 	if X > width:
-		factor = findfactor(width,X)
+		factor = width // X
 		X = int(X - X * factor)
 		
 	if Y > height:
-		factor = findfactor(height,Y)
+		factor = height // Y
 		Y = int(Y - Y * factor)
 		
 	return (X,Y)	
