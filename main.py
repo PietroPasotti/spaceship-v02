@@ -42,7 +42,6 @@ you = factionmethods.Faction()
 you.initFaction(None,False)
 map_smart_dump()
 
-mainmenu = dialogmethods.InteractiveMenu()
 
 
 
