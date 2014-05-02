@@ -19,7 +19,7 @@ class Faction(object):
 		self.states['name'] = 'Noname'
 		
 		self.states['ships'] = []
-		self.states['base'] = None
+		self.states['base'] = []
 		self.states['buildings'] = []
 		self.states['fleets'] = []
 		self.states['allies'] = []
@@ -31,7 +31,7 @@ class Faction(object):
 		
 		self.view = {}          # snapshot of what you currently see. smartly updated
 		self.persistent_view = {} # snapshot of one-shot perceived objects such as enemies
-		self.tracker = [] 		# keeps track of all objects which you have perceived. smartly updated
+		self.tracker = [] 		# keeps track of all objects which you have rights to see. smartly updated
 		
 	
 		if options != {}: 	# if we provide some custom options
@@ -137,14 +137,33 @@ class Faction(object):
 		
 		ships = self.states['ships']
 		base = self.states['base']
+		
+		if base != []:
+			base = [base]
+			
 		buildings = self.states['buildings'] 
 		#fleets = self.states['fleets'] 	
 		
-		allList = ships + buildings + [base]
+		allList = ships + buildings + base
 		
 		return allList
 
 # VIEW METHODS
+
+	def track(self,obj):
+		if self not in obj.trackedBy:
+			obj.trackedBy.append(self)
+
+		if obj not in self.tracker:
+			self.tracker.append(obj)
+		
+	def stopTracking(self,obj):
+		if self in 	obj.trackedBy:
+			obj.trackedBy.remove(self)
+
+		if obj in self.tracker:
+			self.tracker.remove(obj)
+
 	def see(self,obj):
 		"""Adds the object to the faction's view."""
 		

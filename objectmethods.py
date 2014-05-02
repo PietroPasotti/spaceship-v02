@@ -48,6 +48,7 @@ class Sobject(object):
 		
 		
 		self.circle = None
+		self.trackedBy = [] # the list of factions which have the rights to see the object
 		
 		return None
 	
@@ -448,10 +449,10 @@ class Sobject(object):
 					
 					syllable = 'guruguru'
 					
-					if len(arg) >= counter + 1:
+					if len(arg) >= counter + 2:
 						syllable = arg[counter] + arg[counter + 1] # picks the next two letters.
 						
-					if syllable in ['ul','ur','dl','dr']:	# if it recognizes a syllable		
+					if syllable in ['ul','ur','dl','dr']:						# recognize		
 						X,Y = self.states['position']
 						X = X + instructionsDict[letter][0]
 						Y = Y + instructionsDict[letter][1]
@@ -463,7 +464,7 @@ class Sobject(object):
 						
 							
 						self.states['position'] = mapmethods.torusize((X,Y))
-						counter +2						
+						counter +2												# counter goes 2 up
 					else:							
 						letter = arg[counter] # parses the string from 0 to end
 						X,Y = self.states['position']
@@ -481,8 +482,8 @@ class Sobject(object):
 		elif isinstance(arg,tuple):
 	
 			arg = self.closestTowards(arg)
-			
-			if self.ap_pay(mapmethods.distance(oripos,arg))	 == True:				# AP checkpoint
+			dist = mapmethods.distance(oripos,arg)
+			if self.ap_pay(dist)	 == True:				# AP checkpoint
 				pass
 			else:
 				raise Exception('Something wrong here. My APs are {}; oripos = {}, arg = {}'.format(self.actionpoints(), oripos, arg))
@@ -500,7 +501,9 @@ class Sobject(object):
 				ship.states['position'] = self.states['position'] # moves all ships in the shiplist at its new position
 		
 		newpos = deepcopy(self.states['position'])
-		mapmethods.updatePoints(oripos,newpos) # important! updates the mapcode_tracker
+		
+		mapmethods.updatePoints(oripos,self)
+		mapmethods.updatePoints(newpos,self) # important! updates the mapcode_tracker
 	
 	def actionpoints(self):
 		return self.states.get('action_points',None)
@@ -534,7 +537,7 @@ class Sobject(object):
 			tryPoint = path[counter]
 			counter -= 1 # the counter goes one position backwards
 			
-			if maxbearablecost >= tryPoint:
+			if maxbearablecost >= costForPoint[tryPoint]:
 				return tryPoint
 			else:
 				pass
@@ -677,6 +680,22 @@ class Sobject(object):
 
 		print('Attacker has lost {} ships, enemy has lost {} ships.'.format(str(selfloss),str(enemyloss)))
 
+	def diffactions(self,other):
+		"""Returns true iff the other's faction is different from yours, or either one has no faction, or either one is an Independent"""
+		otherfaction = other.states['faction']
+		
+		myfaction  = self.states['faction']
+		
+		if otherfaction is None or myfaction is None:
+			return True
+		elif otherfaction == 'Independent' or myfaction == 'Independent':
+			return True
+		elif myfaction != otherfaction:
+			return True
+		else:
+			return False	
+		
+
 # SPAWN FUNCTIONS
 	def size(self):
 		"""Returns an integer, depending on the size of the vessel."""
@@ -751,6 +770,7 @@ class Sobject(object):
 			
 			myfaction = self.states['faction']
 			
+			a.trackedBy.append(myfaction)
 			a.states['faction'] = myfaction
 			myfaction.states['ships'].extend([a])
 			self.spawn(a)
@@ -767,7 +787,25 @@ class Sobject(object):
 		
 		maxrange = max(choicelist)
 		return maxrange
+
+	def enemiesInRange(self,keyarg = 'list'):
+		circle = self.circle
 		
+		myview = self.states['faction'].view
+		
+		sobjectsInView = [ myview[pos] for pos in list(myview.values()) if pos in self.circle and diffactions( self, sobj) == True ]
+		# enemies in your circle
+		
+		myrange = self.states['range']
+		
+		enemiesinrange = [ sobj for sobj in sobjectsInView if mapmethods.distance( self.pos(), sobj.pos() ) <=  myrange ]
+		# enemies in your circle and in weapons' range
+		
+		if keyarg == 'list':
+			return enemiesinrange # a list, btw.
+		elif keyarg == 'number':
+			return len(enemiesinrange) # the number of enemies in range
+			
 	def updatecircle(self,ray = None):
 		"""Returns the list of absolute positions in which we can safely assume the ship's viewrange is contained."""
 		
@@ -1011,19 +1049,23 @@ class Sobject(object):
 					distanceinsteps = float(targetdistance // steps) # how many steps there are in distance
 					target_chanceToBeSeen = 1.0 - (distanceinsteps * chanceincrementperstep) # the farther it is, the harder it is to see it
 					
-					if not 0 < target_chanceToBeSeen <= 1:
-						raise Exception('Something wrong : target_chanceToBeSeen = {},distanceinsteps = {} chanceincrementperstep = {}, steps = {}, distance = {} '.format(str(target_chanceToBeSeen),distanceinsteps,chanceincrementperstep,steps,targetdistance)  )
-					
-					target_chanceToBeSeen_final = target_chanceToBeSeen - target[1].visibility() # diminishes the chances by target's visibility factor
-					
-					if random.random() <= target_chanceToBeSeen: #  the harder to see it, the lower target_chancetobeseen is
-						self.states['faction'].see(target[1])
-						objectsInRange.remove(target)
-						
-						print('perceived '+ str(target[1]) + ' at ' + str(targetdistance))
-						
-					else:
+					if not 0 < target_chanceToBeSeen <= 1: # doesn't even try.
+						#raise Exception('Something wrong : target_chanceToBeSeen = {},distanceinsteps = {} chanceincrementperstep = {}, steps = {}, distance = {} '.format(str(target_chanceToBeSeen),distanceinsteps,chanceincrementperstep,steps,targetdistance)  )
 						pass
+					else:
+						target_chanceToBeSeen_final = target_chanceToBeSeen - target[1].visibility() # diminishes the chances by target's visibility factor
+					
+						if random.random() <= target_chanceToBeSeen: #  the harder to see it, the lower target_chancetobeseen is
+							for faction in self.trackedBy:
+								faction.see(target[1])
+							
+							#self.states['faction'].see(target[1])
+							objectsInRange.remove(target)
+							
+							print('perceived '+ str(target[1]) + ' at a distance of ' + str(targetdistance))
+							
+						else:
+							pass
 	
 	def ap_gain(self,what):
 		"""Rewards a ship with action points. If the operation is successful, returns True. Else, False."""
@@ -1048,7 +1090,7 @@ class Sobject(object):
 					'attack':8.0,
 					'battle':10.0}
 		
-		if isinstance(what,float): # tries to pay what.
+		if isinstance(what,float) or isinstance(what,int): # tries to pay what.
 			cost = what
 			pass
 		elif what in list(prices.keys()):

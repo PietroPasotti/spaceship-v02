@@ -11,6 +11,9 @@ def clear_all():
 	objectmethods.map_specials = None
 	mapmethods.GOD = None
 	
+def menu():
+	menu = dialogmethods.currentmenu
+	menu.showScreen()
 
 a = Sobject('ship',{'position':(15,15)})
 
@@ -39,7 +42,7 @@ you = factionmethods.Faction()
 you.initFaction(None,False)
 map_smart_dump()
 
-menu = dialogmethods.InteractiveMenu()
+mainmenu = dialogmethods.InteractiveMenu()
 
 
 

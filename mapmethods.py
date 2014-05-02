@@ -144,6 +144,47 @@ def distance(obj1,obj2):
 	dist = int(sqrt(diffX ** 2 + diffY ** 2)) # pitagora
 	return dist
 
+def curMapSizes(kwarg = None):
+	# height,width
+	if kwarg == 'x':
+		return objectmethods.map_specials[1]
+	elif kwarg == 'y':	
+		return objectmethods.map_specials[0]
+	else:
+		return objectmethods.map_specials
+	
+
+def orthogonals(sobject,string):
+	"""Returns the rightmost point IN THE MAP BOUNDARIES w.r.t. the given sobject."""
+	
+	posx,posy = sobject.pos()
+	
+	if string == 'u':
+		return (posx,0)
+	elif string == 'd':
+		return (posx,curMapSizes("y"))
+	elif string == 'r':	
+		return (curMapSizes("x"),posy)
+	elif string == 'r':	
+		return (0,curMapSizes("y"))
+	else:
+		raise Exception("Unrecognised string: "  +  str(string))	
+
+	
+def angles(string):
+	"""Returns the angles of the currently loaded map."""
+	if string == "UL":
+		return (0,0)
+	elif string == "DL":
+		return (0,curMapSizes("y"))
+	elif string == "DR":	
+		return curMapSizes()
+	elif string == "UR":
+		return (curMapSizes("x"),0)
+	else:
+		raise Exception("Unrecognised string: "  +  str(string))
+	
+	
 def torusize(pos):
 	"""Redefines the position so that it is in the frame."""
 	height,width,name = objectmethods.map_specials
@@ -347,31 +388,50 @@ def map_brutal_dump(faction = 'godview'):
 	footer = '    ' + '_' *(width)
 	print(footer)
 
-def updatePoints(pos1, faction = 'god'):
+def updatePoints(pos1, faction_or_sobject = 'god'):
 	"""Updates the mapcode register so as to keep track of small changes. Typical input can be oldposition, newposition of some moving object."""
-	
-	if  faction == 'god':
-		print("Updating god's eyes...")
-		faction = GOD  # the all-seeing I
-		dictionary = objectmethods.mapcode_tracker
-	else:
-		dictionary = faction.view
-	
 
 	if isinstance(pos1,list):
 		pointstoupdate = pos1
-	elif isinstance(pos1,tuple):
+	elif isinstance(pos1,tuple) and len(pos1) == 2:
 		pointstoupdate = [pos1] # can be generalized to take also lists as input
 	else:
-		raise Exception('Bad input for updatePoints function; received {} and {}.'.format(str(pos1),str(pos2)))
+		raise Exception('Bad input for updatePoints function; received {} and {}.'.format(str(pos1),str(pos2)))	
 
+#	if  faction == 'god':
+#		print("Updating god's eyes...")
+#		faction = GOD  # the all-seeing I
+#		dictionary = objectmethods.mapcode_tracker
+#	else:
+#		dictionary = faction.view
+
+	
+	god = GOD
+	godsview = objectmethods.mapcode_tracker	# god sees everything nonetheless
+
+	factionstoupdate = [god]
+	
+	# if the object is tracked by more than one view...
+	
+	if faction_or_sobject != None:
+		if isinstance(faction_or_sobject,objectmethods.Sobject):
+			factionstoupdate.append(faction_or_sobject.states['faction'])
+		elif isinstance(faction_or_sobject, factionmethods.Faction):
+			factionstoupdate.append(faction_or_sobject)
+	
 	for point in pointstoupdate:
-		if isinstance(point,tuple) != True or len(point) > 2:
-			raise Exception('Error here. received pointstoupdate :: ' +str(pointstoupdate))
-
-		dictionary[point] = topObjectAt(point,faction)
-		if dictionary[point] == None:
-			dictionary[point] = faction.persistent_view.get(point,None)
+		for faction in factionstoupdate:
+			if isinstance(point,tuple) != True or len(point) > 2:
+				raise Exception('Error here. received pointstoupdate :: ' +str(pointstoupdate))
+			
+			ontop = topObjectAt(point,faction)
+			
+			if ontop != None:
+				faction.view[point] = ontop
+			elif ontop == None:
+				faction.view[point] = faction.persistent_view.get(point,None)
+			else:
+				raise Exception('Error here. received ontop :: ' +str(ontop))
 	
 	return None
 	
