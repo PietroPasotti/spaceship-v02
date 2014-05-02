@@ -587,6 +587,7 @@ class Sobject(object):
 			self.states['special_conditions'].remove('landed')
 		else:
 			return None
+
 				
 # FIGHT FUNCTIONS
 	def attack(self,other):
@@ -694,7 +695,21 @@ class Sobject(object):
 			return True
 		else:
 			return False	
+	
+	def heal(self,amount,overrides):
 		
+		# will check for APs and situation...
+		
+		if 'max' in overrides:
+			amount = self.states['max_health']
+		
+		if 'override' in overrides:
+			self.states['health'] = amount
+		
+		else:
+			self.ap_pay('heal')	
+		
+			
 
 # SPAWN FUNCTIONS
 	def size(self):
@@ -774,6 +789,7 @@ class Sobject(object):
 			a.states['faction'] = myfaction
 			myfaction.states['ships'].extend([a])
 			self.spawn(a)
+
 		
 # SCAN FUNCTIONS
 	def maxsensorsrange(self):
@@ -1088,6 +1104,7 @@ class Sobject(object):
 					'move2': 1.5,
 					'warp':10.0,
 					'attack':8.0,
+					'heal': 6,
 					'battle':10.0}
 		
 		if isinstance(what,float) or isinstance(what,int): # tries to pay what.
