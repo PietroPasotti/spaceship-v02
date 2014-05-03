@@ -4,23 +4,90 @@ import objectmethods, namegenmethods, utilityfunctions, mapmethods,dialogmethods
 from objectmethods import Sobject
 from mapmethods import newMap, map_smart_dump
 
+dm = dialogmethods
+
+def removeduplicates(alist):
+	for item in alist:
+		if alist.count(item) > 1:
+			alist.remove(item)
+
+
+def itempick(listofoptions,choice = []):
+			
+	chooseashipscreen = dialogmethods.Screen()
+	
+	# invisible actions:
+	invisibacktrigger = dm.Action(chooseashipscreen.Back)
+	invisibacktrigger.setName("-- press Enter to confirm and go back --")
+	invisibacktrigger.setTag('')
+	backbutton = chooseashipscreen.addBack()
+	invisibacktrigger.connect(dm.Action(chooseashipscreen.satisfy,[]))
+	
+	
+	# abstract actions:
+	confirmtrigger = dm.Action(dm.PRINTER.screen.removeFromBody,[backbutton])
+	confirmtrigger2 = dm.Action(chooseashipscreen.addToProtected,[invisibacktrigger])
+	
+	listofactions = []
+		
+	for elem in listofoptions:
+		
+		chooseelem = dm.Action(choice.append, [elem],None,None,"choose {}".format(str(elem)),chooseashipscreen)
+		chooseelem.connect(dm.Action( chooseashipscreen.setFocus ,[ chooseelem ]  ) )
+		
+		def setheader():
+			choicestr = choice[len(choice)-1] # last element
+			chooseashipscreen.header = "{} selected.".format(choicestr )
+			
+		chooseelem.connect(dm.Action( setheader, []  ))
+		chooseelem.connect(confirmtrigger)
+		chooseelem.connect(confirmtrigger2)
+		listofactions.append(chooseelem)
+	
+	def condition1():
+		if len(choice) != 1:
+			return False
+		else:
+			return True
+			
+	#condition1 = dm.Condition("Too many items are selected."  ,[condition1])
+	
+	chooseashipscreen.Start()
+
+def attackscreen(ship):
+	print("here")
+
 def basetest():
-	dm = dialogmethods
-	ms = dm.masterscreen
-	f = dm.Action(print,["hello","world"],2,None,'Print hello world thrice')
-	ms.addToBody(f)
-	f = dm.Action(print,["hello","world"],9,None,'Print hello world nine times')
-	ms.addToBody(f)
-	f = dm.Action(print,["hello","world"],1,'once','Print hello world once,tagged')
-	ms.addToBody(f)
-	f = dm.Action(print,["hello","world"],2,"thrice",'Print hello world thrice,tagged')
-	ms.addToBody(f)
-	ms.printer.display()
-	a.warp(b.pos(),['override'])
+	
+	#situation setup
+	b = me.states['ships'][0] 
+	a.warp(b.pos(),['override'])	
 	a.heal(1,['max','override'])
-	b.heal(1,['max','override'])
-	f = dialogmethods.Action(a.attack,[b],1,'ab',"a attacks b")
-	ms.addToBody(f)
+	a.checkStates()
+	
+	# ms init
+	ms = dm.Screen()
+	
+	choice = [] # what will be returned
+	
+	# buttons definitions for ms
+	f = dm.Action(itempick,[(b,c),choice],1,None,'Choose a ship',ms)
+	e = dm.Action(print,["Idling..."],1,None,"Idle",ms)
+	
+	
+	d = dm.Action(attackscreen,[choice])
+	g = dm.Action(ms.addToBody,[d])
+	ms.onsatisfied_connect(g)
+	
+	
+	ms.Start()
+	
+	choice = choice[len(choice)-1]
+	strchoices = str(choice) 
+	
+	print("good, you have chosen {}".format(  strchoices  ))
+	return choice
+	
 
 
 def clear_all():

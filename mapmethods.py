@@ -180,13 +180,24 @@ def torusize(pos):
 	
 	X,Y = pos # should be a tuple.
 	
-	if X > width:
-		factor = width // X
-		X = int(X - X * factor)
+	if X + Y > 100000000:
+		raise Exception("Wtf?")
+	
+	while True:
+		if  X > width: # x out of range up
+			X = X - width
+				
+		elif Y > height:
+			Y = Y - height
 		
-	if Y > height:
-		factor = height // Y
-		Y = int(Y - Y * factor)
+		elif X < 0:
+			X = X + width
+			
+		elif Y < 0:
+			Y = Y + height
+		
+		else:
+			break
 		
 	return (X,Y)	
 		

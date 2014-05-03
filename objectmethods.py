@@ -54,13 +54,13 @@ class Sobject(object):
 	
 	def __str__(self):
 		if self.objectclass == 'ship':
-			return '{} {} {} ({}) '.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
+			return '{} {} {} ({})'.format(self.objectclass, self.states.get('shipclass'), self.states.get('name', ''), self.states.get('code',''))
 			
 		elif self.objectclass == 'building':
-			return '{} {} {} ({}) '.format(self.objectclass, self.states['buildingclass'], self.states['position'], self.states.get('code',''))
+			return '{} {} {} ({})'.format(self.objectclass, self.states['buildingclass'], self.states['position'], self.states.get('code',''))
 			
 		elif self.objectclass == 'fleet':
-			return '{} in mode {} {} ({}) '.format(self.objectclass,self.states.get('mode', "'normal'"), self.states.get('position',''), self.states.get('code',''))	
+			return '{} in mode {} {} ({})'.format(self.objectclass,self.states.get('mode', "'normal'"), self.states.get('position',''), self.states.get('code',''))	
 		
 		elif self.objectclass == 'asteroid':
 			return 'asteroid {}, floating at {}'.format(self.states['name'],self.pos())
@@ -69,7 +69,7 @@ class Sobject(object):
 			return str(self.states)
 		
 	def __repr__(self):
-		return str(self.states) + str(self.objectclass)
+		return str((self.objectclass, self.states))
 	
 	def name(self):
 		return self.states['name']		
@@ -683,9 +683,9 @@ class Sobject(object):
 
 	def diffactions(self,other):
 		"""Returns true iff the other's faction is different from yours, or either one has no faction, or either one is an Independent"""
-		otherfaction = other.states['faction']
+		otherfaction = other.states.get('faction', None)
 		
-		myfaction  = self.states['faction']
+		myfaction  = self.states.get('faction', None)
 		
 		if otherfaction is None or myfaction is None:
 			return True
@@ -701,7 +701,7 @@ class Sobject(object):
 		# will check for APs and situation...
 		
 		if 'max' in overrides:
-			amount = self.states['max_health']
+			amount = self.states['max_hull_integrity']
 		
 		if 'override' in overrides:
 			self.states['health'] = amount
@@ -765,7 +765,7 @@ class Sobject(object):
 		
 		pos = dodge(selfpos)		
 		
-		sobject.states['position'] = pos 
+		sobject.states['position'] = mapmethods.torusize(pos)  # torusize! 
 		mapmethods.updatePoints(pos) # UPDATES the map!
 		
 		print(str(sobject) + ' spawned from ' +str(self) + ' at position '+ str(pos))
@@ -807,14 +807,19 @@ class Sobject(object):
 	def enemiesInRange(self,keyarg = 'list'):
 		circle = self.circle
 		
-		myview = self.states['faction'].view
+		myfaction = self.states['faction']
 		
-		sobjectsInView = [ myview[pos] for pos in list(myview.values()) if pos in self.circle and diffactions( self, sobj) == True ]
+		self.updatecircle()
+		
+		sobjectsInView = [ sobj for sobj in myfaction.tracker if sobj.pos() in self.circle and sobj.objectclass in ['ship','fleet','building'] ]
+		# sobjects in your circle
+		
+		enemiesinview = [sobj for sobj in sobjectsInView if self.diffactions(sobj) ]
 		# enemies in your circle
 		
 		myrange = self.states['range']
 		
-		enemiesinrange = [ sobj for sobj in sobjectsInView if mapmethods.distance( self.pos(), sobj.pos() ) <=  myrange ]
+		enemiesinrange = [ sobj for sobj in enemiesinview if mapmethods.distance( self, sobj ) <=  myrange ]
 		# enemies in your circle and in weapons' range
 		
 		if keyarg == 'list':

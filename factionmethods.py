@@ -125,6 +125,7 @@ class Faction(object):
 		[print(a.pos()) for a in self.allMyObjects()]
 		self.updateView(False)
 
+
 # FETCHER METHODS		
 	def ships(self):
 		return self.states['ships']
@@ -148,6 +149,19 @@ class Faction(object):
 		
 		return allList
 
+	def factionEnemiesInRange(self):
+		shipstoconsider = []
+		for ship in self.states['ships']:
+			if ship.states['can_attack'] == True:
+				shipstoconsider.append(ship)
+		enemiesinrangeoffaction = set()
+		for ship in shipstoconsider:
+			enemiesinrangeofship = set(ship.enemiesInRange())
+			enemiesinrangeoffaction = enemiesinrangeoffaction.union(enemiesinrangeofship)
+		
+		return list(enemiesinrangeoffaction)
+		
+		
 # VIEW METHODS
 
 	def track(self,obj):
