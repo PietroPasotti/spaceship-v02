@@ -10,7 +10,7 @@ import factionmethods
 
 GOD = 'god_override'
  
-def createMapCode(height = 40,width = 100,asteroidratio = 0.04):  # default values for the whole game
+def createMapCode(height = 24,width = 60,asteroidratio = 0.04):  # default values for the whole game
 	"""Given height and width, plus optional asteroid ratio, produces a mapcode (randomized 0/1 matrix)."""	
 	
 	print('Mapcode initialized with input ' + str((height,width,asteroidratio)) + ', parsing sector with characteristic ' + str(objectmethods.map_specials))
@@ -389,7 +389,7 @@ def map_brutal_dump(faction = 'godview'):
 	print(footer)
 
 def updatePoints(pos1, faction_or_sobject = 'god'):
-	"""Updates the mapcode register so as to keep track of small changes. Typical input can be oldposition, newposition of some moving object."""
+	"""Updates the mapcode register so as to keep track of small changes."""
 
 	if isinstance(pos1,list):
 		pointstoupdate = pos1
@@ -442,25 +442,21 @@ def map_smart_dump(faction = 'godview'):
 	if objectmethods.map_specials == None:
 		return 'No map to be dumped.'
 
-#	if len(objectmethods.mapcode_tracker) < objectmethods.map_specials[0] * objectmethods.map_specials[1] :
-#		return map_brutal_dump(view)
 	
 	if faction != 'godview':
-		# view is then a faction's view property.
 		dictionary = faction.view
 	elif faction == 'godview':
 		global GOD
 		dictionary = GOD.view
 	
-	#if dictionary == {}:
-	#	return map_brutal_dump(faction) # the first time requires a brutal dump
-		
 	height,width,name = objectmethods.map_specials
 	
-	print('smart_dump of ' + name)
-	
+	listoflines = []
+		
 	header = '    ' + '_'*(int(width/2) - 4) + name + '_'*(int(width/2) - 4)
 	print(header)
+	
+	listoflines.append(header)
 	
 	linecounter = 0
 	for y in range(height): # y, height
@@ -475,9 +471,27 @@ def map_smart_dump(faction = 'godview'):
 				todisplay = topobj.states['code']
 			
 			line = line + str(todisplay)
-		line = line + '|  ' + str(linecounter)
+		line = line + '| ' #+ str(linecounter)
 		linecounter +=1
 		
+		
 		print(line)
+		listoflines.append(line)
+
 	footer = '    ' + '^' *(width)
 	print(footer)
+	
+	listoflines.append(footer)
+	totalwidth = width + 2
+	totalheight = height + 2
+	
+	myMAP = ((height,width),listoflines)
+	
+	return myMAP
+	
+	
+	
+	
+	
+	
+	

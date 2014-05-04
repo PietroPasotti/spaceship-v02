@@ -5,91 +5,121 @@ from objectmethods import Sobject
 from mapmethods import newMap, map_smart_dump
 
 dm = dialogmethods
-
-def removeduplicates(alist):
-	for item in alist:
-		if alist.count(item) > 1:
-			alist.remove(item)
+om = objectmethods
 
 
-def itempick(listofoptions,choice = []):
-			
-	chooseashipscreen = dialogmethods.Screen()
+def attackscreen():
 	
-	# invisible actions:
-	invisibacktrigger = dm.Action(chooseashipscreen.Back)
-	invisibacktrigger.setName("-- press Enter to confirm and go back --")
-	invisibacktrigger.setTag('')
-	backbutton = chooseashipscreen.addBack()
-	invisibacktrigger.connect(dm.Action(chooseashipscreen.satisfy,[]))
+	a = om.Sobject('ship',{"shipclass":"swarmer","position":(20,20)})
+	b = om.Sobject('ship',{"shipclass":"fighter","position":(20,21)})
+
+	screen = dm.Screen()
+	screen.header = "Attack screen"
+	dm.Action(om.Sobject.attack,[a,b],1,"A attacks B",screen)
+	dm.Action(om.Sobject.attack,[b,a],2,"B attacks A",screen)
+	dm.Action(setupscreen,[],4,"Go to previous screen",screen)
+	dm.Action(attackscreen,[],None,"Go to attack screen",screen)
+	dm.Action(map_smart_dump,[],None,"Refresh map",screen)
+	dm._currentscreen_ = screen
 	
 	
-	# abstract actions:
-	confirmtrigger = dm.Action(dm.PRINTER.screen.removeFromBody,[backbutton])
-	confirmtrigger2 = dm.Action(chooseashipscreen.addToProtected,[invisibacktrigger])
 	
-	listofactions = []
+def ship_move_interactive(faction,ship):
+	screen = dm.Screen()
+	screen.header = ">> {} <<".format(str(ship))
+	screen.header2 = " ap :: {} ".format(ship.states['action_points'])
+	reload_view = dm.Action(map_smart_dump,[faction])
+	
+	def cheat_AP(somebody):
+		somebody.states['action_points'] = 10
+	
+	reload_screen = dm.Action(ship_move_interactive,[faction,ship])
+	
+	dm.Action(objectmethods.Sobject.move,[ship,"u"],"w","Up",screen,[reload_view,reload_screen] )
+	dm.Action(objectmethods.Sobject.move,[ship,"l"],"a","Left",screen,[reload_view,reload_screen] )
+	dm.Action(objectmethods.Sobject.move,[ship,"d"],"s","Down",screen,[reload_view,reload_screen] )
+	dm.Action(objectmethods.Sobject.move,[ship,"r"],"d","Right",screen,[reload_view,reload_screen] )
+	
+	
+	dm.Action(cheat_AP,[ship],"ap","cheat_ap",screen,[reload_view,reload_screen])
+	dm.Action(shipOptions_main,[faction,ship],"b","Back",screen,[reload_view] )	
+	
+
+	dm._currentscreen_ = screen
+
+def shipOptions_main(faction,ship):
+	screen = dm.Screen()
+	screen.header = ">> {} <<".format(str(ship))
+	reload_view = dm.Action(map_smart_dump,[faction])
+	
+	# a = ship.closestinrange()
+	#dm.Action( ship.attack,[a],None,"Attack closest in range",screen,[reload_view] )
+	dm.Action( ship_move_interactive,[faction,ship],None,"Move",screen,[reload_view] )
+	dm.Action(factionscreen_main,[faction],"b","Back",screen,[reload_view] )	
+	
+	dm._currentscreen_ = screen
+
+def strategyscreen(faction):
+	screen = dm.Screen()
+	screen.header = "Strategic options of {}".format(faction.states['name'])
+	reload_view = dm.Action(map_smart_dump,[faction])
+	dm.Action(factionscreen_main,[faction],None,"Go back, nothing to do yet.",screen,[reload_view])	
+	dm._currentscreen_ = screen
+	
+def fleetselectionscreen(faction):
+	screen = dm.Screen()
+	screen.header = "Pick a fleet from {}'s shiplist".format(faction.states['name'])
+	reload_view = dm.Action(map_smart_dump,[faction])
+	dm.Action(factionscreen_main,[faction],None,"Go back, nothing to do yet.",screen,[reload_view])	
+	dm._currentscreen_ = screen
+	
+def shipselectionscreen(faction):
+	screen = dm.Screen()
+	screen.header = "Pick a ship from {}'s shiplist".format(faction.states['name'])
+	reload_view = dm.Action(map_smart_dump,[faction])
+	
+	for ship in faction.states['ships']:
+		dm.Action(shipOptions_main,[faction,ship], None, "choose {}".format(str(ship)),screen,[reload_view])
+	
+	dm.Action(factionscreen_main,[faction],"b","Back.",screen,[reload_view])
+	dm._currentscreen_ = screen
+	
+def factionscreen_main(faction):
+	screen = dm.Screen()
+	screen.header = "Faction {}".format(faction.states['name'])
+	
+	howmany_ships = len(faction.states['ships'])
+	howmany_fleets = len(faction.states['fleets'])
+	reload_view = dm.Action(map_smart_dump,[faction])
+	
+	if howmany_ships != 0:
+		dm.Action(shipselectionscreen,[faction],None,"Ships actions",screen,[reload_view])
 		
-	for elem in listofoptions:
+	if howmany_fleets != 0:
+		dm.Action(fleetselectionscreen,[faction],None,"Fleets actions",screen,[reload_view])
+	
+	dm.Action(strategyscreen,[faction],None,"Strategy",screen,[reload_view])
+	#screen.printer.display()
+	dm._currentscreen_ = screen
+	
+def initialize():
+	''''''
+	
+	dm._currentscreen_ = dm.Screen()
+	screen = dm._currentscreen_ 
+	screen.header = "Initializer"
+	
+	refresh = dm.Action(map_smart_dump)
+	
+	for faction in factionmethods.existing_factions:
+		accept = dm.Action(print,[''],None,"Chosen faction {}".format(faction.states['name']))
+		reload_view = dm.Action(map_smart_dump,[faction])
+		dm.Action(factionscreen_main,[faction],None,"{}".format(faction.states['name']) ,screen,[refresh,accept,reload_view])
 		
-		chooseelem = dm.Action(choice.append, [elem],None,None,"choose {}".format(str(elem)),chooseashipscreen)
-		chooseelem.connect(dm.Action( chooseashipscreen.setFocus ,[ chooseelem ]  ) )
-		
-		def setheader():
-			choicestr = choice[len(choice)-1] # last element
-			chooseashipscreen.header = "{} selected.".format(choicestr )
-			
-		chooseelem.connect(dm.Action( setheader, []  ))
-		chooseelem.connect(confirmtrigger)
-		chooseelem.connect(confirmtrigger2)
-		listofactions.append(chooseelem)
-	
-	def condition1():
-		if len(choice) != 1:
-			return False
-		else:
-			return True
-			
-	#condition1 = dm.Condition("Too many items are selected."  ,[condition1])
-	
-	chooseashipscreen.Start()
-
-def attackscreen(ship):
-	print("here")
-
-def basetest():
-	
-	#situation setup
-	b = me.states['ships'][0] 
-	a.warp(b.pos(),['override'])	
-	a.heal(1,['max','override'])
-	a.checkStates()
-	
-	# ms init
-	ms = dm.Screen()
-	
-	choice = [] # what will be returned
-	
-	# buttons definitions for ms
-	f = dm.Action(itempick,[(b,c),choice],1,None,'Choose a ship',ms)
-	e = dm.Action(print,["Idling..."],1,None,"Idle",ms)
+	looper = dm.LoopInterpreter()
 	
 	
-	d = dm.Action(attackscreen,[choice])
-	g = dm.Action(ms.addToBody,[d])
-	ms.onsatisfied_connect(g)
 	
-	
-	ms.Start()
-	
-	choice = choice[len(choice)-1]
-	strchoices = str(choice) 
-	
-	print("good, you have chosen {}".format(  strchoices  ))
-	return choice
-	
-
-
 def clear_all():
 	factionmethods.existing_factions = []
 	objectmethods.mapcode_tracker = {}
@@ -111,12 +141,6 @@ c = Sobject('ship',{'shipclass':'fighter', 'position':(13,12)})
 
 #e = Sobject('fleet',{'shiplist':['fighter','fighter','destroyer','cruiser','mothership'], 'position' :(22,23)})
 
-
-a.attack(b)
-b.attack(c)
-c.attack(a)
-a.attack(c)
-
 newMap()
 
 mapmethods.GOD.god_spawn([a,b,c])
@@ -126,8 +150,8 @@ me = factionmethods.Faction()
 me.initFaction(None,False)
 you = factionmethods.Faction()
 you.initFaction(None,False)
-map_smart_dump()
+#map_smart_dump()
 
 
-basetest()
+
 
