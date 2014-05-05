@@ -40,6 +40,10 @@ class Sobject(object):
 		elif self.objectclass == 'debris':
 			self.states['name'] == 'debris'
 			self.initDebris(specialattrs_dict)
+		
+		elif self.objectclass == "externality":
+			self.states['objectclass'] == 'externality'
+			self.initExternality(specialattrs_dict)
 			
 		else:
 			return 'Unsupported objectclass input for Sobject constructor'
@@ -202,6 +206,15 @@ class Sobject(object):
 			self.states[entry] = specialattrs[entry]
 		
 		self.checkStates()
+
+	def initExternality(self,specialattrs):
+		"""Initializes your favourite externality, from a superstring to a black hole, to an old alien wreckage."""
+		
+		self.states['codename'] = "ext_" + namegenmethods.namegen('a')
+		
+		for entry in specialattrs:  # most of the work here must be done by custom work!
+			self.states[entry] = specialattrs[entry]		
+		
 		
 	def initBuilding(self,specialattrs):
 		"""Building Sobject initializer."""
@@ -500,6 +513,8 @@ class Sobject(object):
 			for ship in self.states['shiplist']:
 				ship.states['position'] = self.states['position'] # moves all ships in the shiplist at its new position
 		
+		self.scan("lazy") # automatically scans
+		
 		newpos = deepcopy(self.states['position'])
 		
 		mapmethods.updatePoints(oripos,self)
@@ -592,6 +607,13 @@ class Sobject(object):
 # FIGHT FUNCTIONS
 	def attack(self,other):
 		"""Any combination of ship vs fleet vs building."""
+		inrange = self.enemiesInRange()
+		if other == "auto" and inrange == []:
+			return None
+		elif other == "auto" and inrange != []:
+			self.attack(inrange[0])
+			
+		
 		if isinstance(other,Sobject) == False:
 			raise objectmethodsError('Bad input for Sobject.attack function: ' + str(other) + ' is not a Sobject.')
 		
@@ -710,7 +732,6 @@ class Sobject(object):
 			self.ap_pay('heal')	
 		
 			
-
 # SPAWN FUNCTIONS
 	def size(self):
 		"""Returns an integer, depending on the size of the vessel."""
@@ -747,11 +768,6 @@ class Sobject(object):
 			pass # passes only if the sobject is a Sobject object
 		else:
 			raise Exception('Bad input for spawn function; received a ' + str(sobject) + ' instead of a spawnable.')
-		
-		if self.states['spawn'] < sobject.size():
-			return 'Cannot spawn this ship from this object.'
-		else:
-			pass
 		 
 		def dodge(tpl):
 			"""Returns all eight squares adjacent to a x,y position tuple."""
@@ -773,11 +789,6 @@ class Sobject(object):
 	def launch(self, shipclass, shipnumber, overrides):
 		"""Buys and spawns shipnumber ships of shipclass class."""
 		listofships = []
-		if 'override' in overrides:
-			pass
-		else:
-			# checks for ENERGY! 
-			pass
 			
 		for i in range(shipnumber):
 			a = objectmethods.Sobject('ship',{'shipclass':shipclass})
@@ -1022,12 +1033,12 @@ class Sobject(object):
 				raise Exception('Unsupported objectclass for scan function: received a ' + str(self)+ str(params) + str(overrides))
 		
 		else:
-			raise Exception('Unrecognized parameters for scan function: received a '+  str(params))
+			pass
 		
 		if 'free' in overrides: # passes without paying aps
 			return self.runScan(overrides)
 			
-		if self.ap_pay('scan' + params) == True:
+		if self.ap_pay('scan') == True:
 			pass
 		else:
 			return dialogmethods.cantPerform() # can't perform action	
@@ -1087,7 +1098,9 @@ class Sobject(object):
 							
 						else:
 							pass
-	
+
+
+# APs	
 	def ap_gain(self,what):
 		"""Rewards a ship with action points. If the operation is successful, returns True. Else, False."""
 		
@@ -1104,11 +1117,12 @@ class Sobject(object):
 		
 		selfAP = self.states['action_points']
 		
-		prices = {	'scanlong' : 2.0,
+		prices = {	'scanlong' : 3.0,
+					"scan" : 2.0,
 					'move1':1.0,
 					'move2': 1.5,
 					'warp':10.0,
-					'attack':8.0,
+					'attack':4.0,
 					'heal': 6,
 					'battle':10.0}
 		
@@ -1127,5 +1141,38 @@ class Sobject(object):
 		
 		else:
 			return False
+
+	def ap_topup(self):
+		self.states['action_points'] = 10
+
+# BUILDING-SPECIFIC FUNCTIONS		
+	def autoattack(self):
+		"""This function is a switch."""
 		
+		if hasattr(self,"autoattack") == False:
+			self.autoattack = False
+			
+		self.autoattack = not self.autoattack
+	
+	def canspawn(self):
 		
+		if self.states.get("spawn",0) > 0:
+			return True
+		else:
+			return False
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

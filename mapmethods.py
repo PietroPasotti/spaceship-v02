@@ -8,9 +8,9 @@ import utilityfunctions
 import namegenmethods
 import factionmethods
 
-GOD = 'god_override'
+GOD = 'godmode'
  
-def createMapCode(height = 24,width = 60,asteroidratio = 0.04):  # default values for the whole game
+def createMapCode(height = 30,width = 105,asteroidratio = 0.04):  # default values for the whole game
 	"""Given height and width, plus optional asteroid ratio, produces a mapcode (randomized 0/1 matrix)."""	
 	
 	print('Mapcode initialized with input ' + str((height,width,asteroidratio)) + ', parsing sector with characteristic ' + str(objectmethods.map_specials))
@@ -345,7 +345,7 @@ def allObjectsAt(coordinates,dictionary='default'):
 	else: # returns all objects in view at point
 		return dictionary[coordinates]
 	
-def map_brutal_dump(faction = 'godview'):
+def map_brutal_dump(faction = 'godmode'):
 	"""Brutally dumps the codes of all Sobjects existing in the universe."""
 	
 	if objectmethods.map_specials == None:
@@ -435,17 +435,15 @@ def updatePoints(pos1, faction_or_sobject = 'god'):
 	
 	return None
 	
-def map_smart_dump(faction = 'godview'):
-	"""Tries to dump the map in an intelligent way. If there is no map, returns a message. If the map has not been brutal_dumped before, 
-	and the dictionary is thus too little, it brutal_dumps it automatically."""
+def map_smart_dump(faction = 'godmode',direct = False):
+	"""Tries to dump the map in an intelligent way. If there is no map, returns a message."""
 	
 	if objectmethods.map_specials == None:
 		return 'No map to be dumped.'
 
-	
-	if faction != 'godview':
+	if faction != 'godmode':
 		dictionary = faction.view
-	elif faction == 'godview':
+	elif faction == 'godmode':
 		global GOD
 		dictionary = GOD.view
 	
@@ -454,7 +452,7 @@ def map_smart_dump(faction = 'godview'):
 	listoflines = []
 		
 	header = '    ' + '_'*(int(width/2) - 4) + name + '_'*(int(width/2) - 4)
-	print(header)
+	#print(header)
 	
 	listoflines.append(header)
 	
@@ -475,11 +473,62 @@ def map_smart_dump(faction = 'godview'):
 		linecounter +=1
 		
 		
-		print(line)
+		#print(line)
 		listoflines.append(line)
 
 	footer = '    ' + '^' *(width)
-	print(footer)
+	#print(footer)
+	
+	listoflines.append(footer)
+	totalwidth = width + 2
+	totalheight = height + 2
+	
+	myMAP = ((height,width),listoflines)
+	return myMAP
+	
+	
+def map_smart_dump_doubleview(faction = 'godmode'):
+	"""Tries to dump the map in an intelligent way. If there is no map, returns a message. If the map has not been brutal_dumped before, 
+	and the dictionary is thus too little, it brutal_dumps it automatically."""
+	
+	if objectmethods.map_specials == None:
+		return 'No map to be dumped.'
+
+	if faction != 'godmode':
+		dictionary = faction.view
+	elif faction == 'godmode':
+		dictionary = objectmethods.mapcode_tracker
+	
+	height,width,name = objectmethods.map_specials
+	
+	listoflines = []
+		
+	header = '    ' + '_'*(int(width/2) - 4) + name + '_'*(int(width/2) - 4)
+
+	
+	listoflines.append(header)
+	
+	linecounter = 0
+	for y in range(height): # y, height
+		line = '   |'
+		for x in range(width): # x, width
+		
+			topobj = dictionary.get((x,y)) # retrieves the object from the dictionary!
+			
+			if topobj == None:
+				todisplay = ' '
+			else:
+				todisplay = topobj.states['code']
+			
+			line = line + str(todisplay)
+		line = line + '| ' #+ str(linecounter)
+		linecounter +=1
+		
+		
+
+		listoflines.append(line)
+
+	footer = '    ' + '^' *(width)
 	
 	listoflines.append(footer)
 	totalwidth = width + 2
@@ -487,10 +536,7 @@ def map_smart_dump(faction = 'godview'):
 	
 	myMAP = ((height,width),listoflines)
 	
-	return myMAP
-	
-	
-	
+	return myMAP	
 	
 	
 	

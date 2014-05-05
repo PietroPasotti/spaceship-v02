@@ -51,7 +51,7 @@ faction_mainMenu:
 """
 
 
-_currentscreen_ = None
+
 
 class Screen():
 	
@@ -66,11 +66,14 @@ class Screen():
 		self.protected_body = []
 		self.header2 = ""
 		self.footer = ""
-		self.printer = Printer()
-		self.printer.screen = self
+		#self.printer = None
+		#self.printer.screen = self
 	
 	def close(self):
 		self.closetoggled = True
+		
+	def setFooter(self,string):
+		self.footer =  string
 	
 	def addToBody(self,actionslist):
 		
@@ -80,6 +83,17 @@ class Screen():
 					self.body.append(action)
 		elif isinstance(actionslist,Action) or isinstance(actionslist,HyperAction): 
 			self.body.append(actionslist)
+		else:
+			raise Exception("Something bad received.")
+			
+	def addToProtected(self,actionslist):
+		
+		if isinstance(actionslist,list):
+			for action in actionslist:
+				if isinstance(action,Action) or isinstance(action,HyperAction):
+					self.protected_body.append(action)
+		elif isinstance(actionslist,Action) or isinstance(actionslist,HyperAction): 
+			self.protected_body.append(actionslist)
 		else:
 			raise Exception("Something bad received.")
 			
@@ -99,7 +113,7 @@ class Menu(Screen):
 
 class Action():
 	
-	def __init__(self,function=None,arguments=[],key= None,name=None,screen = None,connectedto = []):
+	def __init__(self,function=None,arguments=[],key= None,name=None,screen = None,connectedto = [],protected = False):
 		
 		self.key = key
 		self.name = name
@@ -108,7 +122,10 @@ class Action():
 		self.connectedto = connectedto
 		
 		if screen != None:
-			screen.addToBody(self)
+			if protected == True:
+				screen.addToProtected(self)
+			else:
+				screen.addToBody(self)
 		
 		self.screen = screen
 		
@@ -158,47 +175,23 @@ class HyperAction():
 			
 	
 
+_currentscreen_ = Screen()
+_currentfaction_ = "godmode"
+
 
 class Printer():
 	
 	def __init__(self):
 		self.mode = 'choice'
 		self.screen = _currentscreen_
+		self.setFaction()
 		
-	def display(self,screen = None):
-		"""Prints all there is to print in Screen's body, headers, protected_body and footer."""
-		if screen == None:
-			screen = self.screen
-		else:
-			self.screen = screen	
+	def setFaction(self,faction = 'godmode'):
+		self.faction = faction
 
+	def printScreen(self,screen,faction = "godmode"):
 		
-		choice = None
-		while True: # waitforinput loop
-			
-			self.printScreen()
-			choicedict = self.choicedict # defined by printScreen call
-			
-			choice = input(" >>> :: = ")
-			try:
-				choice = int(choice)
-			except ValueError: # we try to convert it into an integer, which will be captured if the key index is given by the counter
-				pass
-				
-			# we accept not only strings but also integers
-			if choice in  list(choicedict.keys()):
-				break
-			else:
-				insult = random.choice(["asshole","dickhead","bitch","sucker","zombie","loser","stupid","idiot","dwarf"])
-				print("Bad input, {}. Available options are {}.".format(insult, list(choicedict.keys()) ))
-				
-		mychoice = choicedict[choice]
-		
-		return mychoice()
-
-	def printScreen(self):
-		
-		header,header2,screenbody,protected_body,footer = self.screen.All()
+		header,header2,screenbody,protected_body,footer = screen.All()
 		
 		choicedict = {} # this will collect the output
 		
@@ -212,10 +205,10 @@ class Printer():
 			print("       " + '-'*P + "{}".format(string) + '-'*P)
 		
 		printcentered(header)
-		print("       " + "-"*100)
+		#print("       " + "-"*100)
 		if header2 != "":
 			printcentered(header2)
-			print("       " + "-"*100)
+		#	print("       " + "-"*100)
 	
 		voicecounter = 0
 		lengthcounter = 0
@@ -229,7 +222,7 @@ class Printer():
 				voicecounter += 1
 			
 			if isinstance(key,int):
-				spaces = 5- len(str(key))
+				spaces = 5 - len(str(key))
 			else:
 				spaces = 5 - len(key)
 				
@@ -242,9 +235,6 @@ class Printer():
 			lengthcounter +=1
 		
 		if protected_body != []:
-			
-			print('')
-			
 			for action in protected_body: # special voices, such as 'back', which are 3-tuples	
 				key = action.key
 				if key in choicedict.keys():
@@ -258,12 +248,91 @@ class Printer():
 
 		
 			
-		print("       " + "-"*100)			
+		#print("       " + "-"*100)			
 		
 		if footer != "":
 			printcentered(footer)
 			print("       " + "-"*100)
 			
+		return choicedict
+
+	def printDoubleScreen(self,faction ="godmode", screenwidth = 120):
+		header,header2,screenbody,protected_body,footer = _currentscreen_.All()
+			
+		screenwidth = 100
+		screenheight = 29
+		
+		halfscreen = screenwidth // 2
+		quarter = halfscreen // 2
+		
+		divline = 30 # where the line will be drawn
+		Ndivline = screenwidth - divline # what's left to the right of the divline
+		
+		mapdict = mapmethods.map_smart_dump_doubleview(faction) # retrieves the view for the chosen faction
+		# is a tuple ((height,width),listoflines)
+		height,width = mapdict[0]
+		listoflines = mapdict[1]
+		
+		choicedict = {} # this will collect the output
+		mapdict = {}
+		
+		counter = 3
+		for line in listoflines:
+			mapdict[counter] = line
+			counter += 1
+			
+		interpredict = {}
+		interpredict[0] = "-" * screenwidth											# 0
+		if header not in [""," ", "  "]:											# 1
+			line = header + " "*(halfscreen - len(header))
+			line = line[:halfscreen] #crops the line
+			interpredict[1] = line	
+		interpredict[2] = "-" * screenwidth											# 2
+		if header2 not in [""," ", "  "]:
+			line = header2 + " "*(halfscreen - len(header2))
+			line = line[:halfscreen] #crops the line
+			interpredict[3] = line													# 3
+		counter = 5
+		choicecounter = 1
+		for action in screenbody:
+			if action.key == None or len(str(action.key))>3:
+				key = choicecounter
+				choicecounter += 1
+			else:
+				key = action.key
+			line = " [{}]  >>  {}".format(key,action.name) 
+			line = line[:halfscreen] #crops the line
+			lenline = len(line)
+			interpredict[counter] = line + " "*(halfscreen - lenline)
+			choicedict[key] = action
+			counter += 1		
+		
+		counter = counter +2
+		for action in protected_body:
+			if action.key == None or len(str(action.key))>3:
+				key = choicecounter
+				choicecounter += 1
+			else:
+				key = action.key
+			line = " [[{}]]  >> {}".format(key,action.name) 
+			line = line[:halfscreen] #crops the line
+			lenline = len(line)
+			interpredict[counter] = line + " "*(divline - lenline)
+			choicedict[key] = action
+			counter += 1				
+		
+		interpredict[len(listoflines) +3 ] = " --> " + footer
+		
+		####
+		for i in range(1,len(listoflines)+ 4):
+			blankhalf = halfscreen*" "
+			sx = interpredict.get(i,blankhalf)
+			dx = mapdict.get(i, blankhalf)
+			print(sx + dx)
+		####
+		
+		
+		
 		return choicedict
 
 	def Ask(self,outputtype,message,availableoptions=[]):
@@ -300,30 +369,63 @@ class Printer():
 				
 		
 		return choice	
-		
-	
+
+
+
 class LoopInterpreter():
 	
-	def __init__(self):
+	def __init__(self,printmode = "single"):
 		
-		self.screen = _currentscreen_
+		self.looping = False
 		self.printer = Printer()
-		self.startLooping()
+		self.halted = False
+	
+	def setPrinter(self,printer):
+		self.printer = printer
+	
+	def halt(self):
+			
+		self.halted = True
+	
+	def startLooping(self,printmode = "single"):
 		
-	def startLooping(self):
+		
+		if self.printer == None:
+			raise Exception("No printer.")
+		
 		self.looping = True
+		
+		if printmode == "single":
+			printfunction = Printer.printScreen
+		elif printmode == "double":
+			printfunction = Printer.printDoubleScreen
+			
 		
 		while True:
 			
-			self.printer.screen = _currentscreen_
-			choicedict = self.printer.printScreen()                          # will be filled in by printScreen call
+			self.screen = _currentscreen_
+			faction = _currentfaction_
+			
+			if isinstance(faction,factionmethods.Faction) and faction.states['faction_points'] == 0:
+				nextturn = Action(factionmethods.nextTurn,[],"p","Pass Turn")
+				_currentscreen_.addToProtected(nextturn)
+				
+			mapdict = mapmethods.map_smart_dump(faction,True)
+			
+			for line in mapdict[1]:
+				print(line)
+			
+			choicedict = self.printer.printScreen(self.screen)                
 			 # we always print the same screen; actions will make it change
-													
+			
+			if self.halted == True:
+				print("byebye")
+				break										
 
-			choice = input(" >>> :: = ")
+			choice = input(" >>> :: ")
 			try:
-				choice = int(choice)									# we accept not only strings but also integers
-			except ValueError: # we try to convert it into an integer, which will be captured for example if the key index is given by the counter
+				choice = int(choice)
+			except ValueError: 
 				pass
 				
 			
@@ -333,11 +435,20 @@ class LoopInterpreter():
 				mychoice() 							# calls the output
 				
 			else:
-				insult = random.choice(["asshole","dickhead","bitch","sucker","zombie","loser","stupid","idiot","dwarf"])
-				print("Bad input, {}. Available options are {}.".format(insult, list(choicedict.keys()) ))
-				
-			
+				comment = random.choice(["","","","","","","","","","","","","","","","","","","","","","","",""," You sure you're human?"," You're so stupid you wouldn't pass the Turing Test."," Oh come on."," I really don't get that crap."," Oh, please..."])
+				insult = random.choice(["asshole","dickhead","bitch","sucker","zombie","loser","stupid","idiot","dwarf","neo","ladyboy","paperhand","orchinicer","dummy","nigga bro"])
+				footer = "Bad input, {}. Available options are {}.{} ".format(insult, list(choicedict.keys()),comment) + self.screen.footer
+				self.printer.screen.footer = footer[:100] + "||"
 
+
+# utilities				
+activelooper = LoopInterpreter()
+
+def haltactivelooper():
+	return activelooper.halt()
+			
+def cantPerform(reason = ""):
+	_currentscreen_.footer = "Can't perform chosen action. {}".format(reason)
 
 
 

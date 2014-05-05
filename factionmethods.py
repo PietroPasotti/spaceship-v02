@@ -8,6 +8,24 @@ import utilityfunctions
 protected_factions = ['Independent','GOD']
 existing_factions = []
 
+currentTurn = 0
+
+def NextTurn(faction):
+	"""faction will allow to track who called the nextturn."""
+	
+	global currentTurn 
+	
+	currentTurn += 1
+	
+	for faction in existing_factions:
+		faction.fp_topup()
+		faction.collectenergy()
+		F = objectmethods.Sobject.ap_topup
+		onallmy(self.allMyObjects, function = F )
+
+
+
+
 class Faction(object):
 	
 	def __init__(self,options = {}):
@@ -24,8 +42,13 @@ class Faction(object):
 		self.states['fleets'] = []
 		self.states['allies'] = []
 		self.states['hostiles'] = []
+		self.states['energy'] = 2
+		
+		self.energysources = []
+		
+		self.states['faction_points'] = 10
 
-		if options == 'god_override':
+		if options == 'godmode':
 			existing_factions.extend([self])
 			return self.initGodMode()
 		
@@ -127,6 +150,7 @@ class Faction(object):
 
 
 # FETCHER METHODS		
+
 	def ships(self):
 		return self.states['ships']
 		
@@ -229,7 +253,104 @@ class Faction(object):
 		for key in self.view:
 			otherfaction.see(self.view[key])
 
-# SPAWNER METHODS		
+	def complete_scan(self):
+		
+		if self.pay("scan") != True:
+			return dialogmethods.cantPerform()
+		
+		for ship in self.states['ships']:
+			ship.scan()
+
+		
+# FACTION POINTS METHODS	
+
+	def pay(self,what):
+		
+		selfAP = self.states['faction_points']
+		
+		prices = {	'scan' : 2.0,
+					'scanbest':1.0,
+					'move_all': 1.5,
+					'strategy':10.0,
+					'warp':2.0,
+					'repairs': 6,
+					'fight_all':10.0}
+		
+		if isinstance(what,float) or isinstance(what,int): # tries to pay what.
+			cost = what
+			pass
+		elif what in list(prices.keys()):
+			cost = prices[what]
+		else:
+			raise Exception('Bad input for pay: received {} {}'.format(self,what))
+			
+			
+		if cost <= selfAP:
+			self.states['faction_points'] -= cost
+			return True
+		
+		else:
+			return False
+
+	def fp_topup(self):	tion
+		self.states["faction_points"] = amount # top
+
+
+# ENERGY
+
+	def energy(self,setto = None):
+		
+		if setto != None and isinstance(int,setto):
+			self.states['energy'] = setto
+			
+		return self.states['energy']
+		
+	def energy_pay(self,what):
+		
+		selfen = self.states['energy']
+		
+		if isinstance(what,float) or isinstance(what,int): # tries to pay what.
+			cost = what
+			pass
+		elif what in list(prices.keys()):
+			cost = prices[what]
+		else:
+			raise Exception('Bad input for pay: received {} {}'.format(self,what))
+			
+			
+		if cost <= selfAP:
+			self.states['energy'] -= cost
+			return True
+		
+		else:
+			return False
+
+	def checksources(self):
+		
+		gainpersource = {"generator":1,
+					"lost_outpost":1,
+					"alien_powerplant":2,
+					"superstring":2}
+		
+		totalgain = 1 # minimum
+		for source in self.energysources:
+			if source.states['health'] == 'destroyed':
+				self.energysources.remove(source)
+			else:
+				sourcegain = gainpersource.get(source.states['sourcetype'], "generator")
+				totalgain += sourcegain
+
+		return newen
+			
+	def collectenergy(self):
+		
+		newen = self.checksources()
+		
+		self.states['energy'] += newen 
+
+
+# SPAWNER METHODS
+	
 	def god_spawn(self,params = []):
 		"""A religious function. Spawns some ships around the map, randomly. Can receive either a number of ships to spawn or a name-based shiplist"""
 		
@@ -275,5 +396,106 @@ class Faction(object):
 		else:
 			raise Exception('Unrecognised input for god_spawn function: received {}'.format(params))
 
+	def initialize_and_spawn(self,objecttype,listofobjectsbyname,fromwhere):
+		
+		for objname in listofobjectsbyname:
+			
+			if objecttype is "ship":
+				newobj = objectmethods.Sobject("ship",{"shipclass" : objname, "faction" : self})
+			elif objecttype is "building":
+				newobj = objectmethods.Sobject("building",{"buildingclass" : objname, "faction" : self})
+			else:
+				raise Exception("Unrecognized input: {}".format(listofobjectsbyname))
+				
+			self.spawn(newobj,fromwhere)
+		
+		return None
+				
+	def	spawn(self,what,fromwhere):
+		
+		costsdict = {	"fighter":2,
+						"swarmer":1,
+						"bomber":4,
+						"destroyer":10,
+						"cruiser":15,
+						"mothership":None,
+						"base" : None,
+						"shipyard_small":10,
+						"shipyard_medium":15,
+						"shipyard_big":22,
+						"generator":5,
+						"battery":5,
+						"buoy":2,
+						"decoy":1}
+			
+		if what.objectclass == "building":	
+			whatclassname = what.states["buildingclass"] 
+		elif what.objectclass == "ship":
+			whatclassname = what.states["shipclass"]
+		else:
+			raise Exception("Unrecognized input: {}".format(str(what)) ) 
+			
+		cost = costsdict.get(whatclassname)
+		
+		if cost == None:
+			dialogmethods.cantPerform("You are not allowed to build that object.")
+		
+		spawnerlevel = fromwhere.states.get("spawn",None)
+		if spawnerlevel is None:
+			spawnerlevel = fromwhere.states.get("max_spawn",0)
+		
+		if spawnerlevel < spawncostsdict[what.objectclass]:
+			dialogmethods.cantPerform("{} cannot spawn {}, because its spawner level is not high enough.".format(fromwhere,whatclassname))
+		
+		if self.energy_pay(cost) == False:
+			return None
+		
+		# all checks passed
+		
+		fromwhere.spawn(what)
+		
+
+# UTILITIES
+
+	def onallmy(self,objecttype = "ships",function = None):
+		"""	This function has three uses:
+			Use 1 : Distributes a function call to each and every of its objects of some specified type.
+			Use 2 : returns a list of all the object of a specified kind, ships by default.
+			Use 3 : if objecttype is a list of objects, and the function is defined, we call the function on each object of the list."""
+		
+		if isinstance(objecttype, list) and function is not None and hasattr(function,__call__):
+			for elem in objecttype:
+				function(elem)
+			
+		elif objecttype not in ["ships","buildings","fleets"]:
+			raise Exception("Bad input: {} instead of {}".format(objecttype, str(["ships","buildings","fleets"])))
+		
+		if function is not None and hasattr(function,__call__):
+			for obj in self.states[objecttype]:
+				function(obj)
+		else:
+			return self.states[objecttype]
+
 
 		
+
+
+
+
+
+
+
+		
+		
+		
+
+
+
+
+
+
+
+
+
+
+
