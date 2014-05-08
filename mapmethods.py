@@ -10,7 +10,7 @@ import factionmethods
 
 GOD = 'godmode'
  
-def createMapCode(height = 30,width = 105,asteroidratio = 0.04):  # default values for the whole game
+def createMapCode(height = 25,width = 110,asteroidratio = 0.04):  # default values for the whole game
 	"""Given height and width, plus optional asteroid ratio, produces a mapcode (randomized 0/1 matrix)."""	
 	
 	print('Mapcode initialized with input ' + str((height,width,asteroidratio)) + ', parsing sector with characteristic ' + str(objectmethods.map_specials))
@@ -21,8 +21,8 @@ def createMapCode(height = 30,width = 105,asteroidratio = 0.04):  # default valu
 	
 	print('Generating mapcode...')
 	
-	for y in range(height):
-		for x in range(width):
+	for y in range(1,height):
+		for x in range(1,width):
 			if random.random() > probabPlotAsteroid:
 				pass
 			else:
@@ -57,7 +57,12 @@ def	neighbourCount(point,dictionary):
 def propagate2(mapcodeheightwidth,threshold=0.3,numiters=3):     # default values, not modifiable
 	"""Propagation algorithm 2"""
 	
-	mapcode,height,width = mapcodeheightwidth
+	if isinstance(mapcodeheightwidth,tuple):
+		mapcode,height,width = mapcodeheightwidth
+	else:
+		mapcode = mapcodeheightwidth
+		height = 25
+		width = 110   # BAD!!
 	
 	# mapdode comes as a dictionary 'mapcode'	
 
@@ -86,7 +91,7 @@ def propagate2(mapcodeheightwidth,threshold=0.3,numiters=3):     # default value
 			for i in range(5):
 				Rounded_MAPCODE[(x+random.randint(-1,1),y+random.randint(-1,1))] = 1	 # add to the NEW dictionary! otherwise...
 	
-	croppedRounded_MAPCODE = {pos : Rounded_MAPCODE[pos] for pos in Rounded_MAPCODE if pos[1] <= height and pos[0] <= width}
+	croppedRounded_MAPCODE = {pos : Rounded_MAPCODE[pos] for pos in Rounded_MAPCODE if pos[1] <= height and pos[0] <= width and pos[1] > 0 and pos[0] > 0}
 	
 	print('\n ' + str(astrocount) + ' asteroids created!')
 	

@@ -215,7 +215,6 @@ class Sobject(object):
 		for entry in specialattrs:  # most of the work here must be done by custom work!
 			self.states[entry] = specialattrs[entry]		
 		
-		
 	def initBuilding(self,specialattrs):
 		"""Building Sobject initializer."""
 		buildingclass = specialattrs.get('buildingclass')
@@ -283,7 +282,7 @@ class Sobject(object):
 		
 		
 		self.checkStates()
-		mapmethods.updatePoints(self.states['position'])
+		mapmethods.updatePoints(self.states['position'],self)
 	
 	def checkStates(self,params = None):
 		"""Updates automatically all dependencies between states, of any subclass of Sobject, by calling their specific subfunctions."""
@@ -860,12 +859,12 @@ class Sobject(object):
 		"""Determines its visibility based on its special_conditions and other factors. The lower, the more the object is hidden."""
 		
 		if self.objectclass == 'asteroid':
-			return 1 # asteroids are always visible at max (and once discovered should stay visible)
+			return 1.0 # asteroids are always visible at max (and once discovered should stay visible)
 		
 		if 'hidden' in self.states['special_conditions']:
 			return 8.0 # this means that it is barely visible! 20% chances only if distance <= 1. Very low!
 			
-		return 0.0
+		return 1.0
 
 	def setupSensorArrays(self,standardgroup_or_models=[],overrides=[]):
 		"""Accepted inputs: 'dummy', 'basic_arrays', 'average_arrays', 'advanced_arrays', '*some-model*'; equips the object with such sensors."""
@@ -1113,7 +1112,8 @@ class Sobject(object):
 			return True
 		
 	def ap_pay(self,what):
-		"""Makes a ship spend its aps for some action. If that is feasible (the cost can be paid), returns True; else, False."""
+		"""Makes a ship spend its aps for some action. If that is feasible (the cost can be paid),
+		returns True and pays; else, returns False and does nothing."""
 		
 		selfAP = self.states['action_points']
 		
@@ -1144,6 +1144,7 @@ class Sobject(object):
 
 	def ap_topup(self):
 		self.states['action_points'] = 10
+
 
 # BUILDING-SPECIFIC FUNCTIONS		
 	def autoattack(self):

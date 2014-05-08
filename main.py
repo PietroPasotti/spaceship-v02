@@ -8,7 +8,6 @@ dm = dialogmethods
 om = objectmethods
 
 
-
 def doublescreencheck():
 	
 	screen = dm.Screen()
@@ -243,8 +242,8 @@ def factionscreen_main(faction):
 	dm._currentscreen_ = screen
 
 
-
-@Screener
+# if decommented starts the menu automatically
+#@Screener
 def initialize(screen):	
 	screen.header = "Initializer"
 	
@@ -255,7 +254,6 @@ def initialize(screen):
 	dm.Action(dialogmethods.LoopInterpreter.halt,[dm.activelooper],"halt","Exit LoopInterpreter",screen, protected = True) # protected
 	
 	
-		
 def clear_all():
 	factionmethods.existing_factions = []
 	objectmethods.mapcode_tracker = {}
@@ -277,16 +275,14 @@ d = Sobject('fleet',{'shiplist':['fighter','destroyer','cruiser','swarmer',b], '
 
 e = Sobject('fleet',{'shiplist':['fighter','fighter','destroyer','cruiser','mothership'], 'position' :(22,23)})
 
-newMap()
+#newMap()
 
-mapmethods.GOD.god_spawn([a,b,c])
+#mapmethods.GOD.god_spawn([a,b,c])
 
-me = factionmethods.Faction()
-me.initFaction(None,False)
-you = factionmethods.Faction()
-you.initFaction(None,False)
-#map_smart_dump()
+#me = factionmethods.Faction()
+#me.initFaction(None,False)
+#you = factionmethods.Faction()
+#you.initFaction(None,False)
 
 
-#doublescreencheck()
 

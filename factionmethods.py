@@ -292,7 +292,7 @@ class Faction(object):
 		else:
 			return False
 
-	def fp_topup(self):	tion
+	def fp_topup(self):	
 		self.states["faction_points"] = amount # top
 
 
